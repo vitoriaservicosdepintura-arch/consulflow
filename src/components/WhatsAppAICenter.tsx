@@ -135,6 +135,7 @@ const WhatsAppAICenter = () => {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [iaStatus, setIaStatus] = useState<Record<string, boolean>>({});
     const [isIASuggesting, setIsIASuggesting] = useState(false);
+    const [presencas, setPresencas] = useState<Record<string, { isOnline: boolean, lastSeen: string | null }>>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -209,11 +210,12 @@ const WhatsAppAICenter = () => {
         init();
     }, [apiUrl]);
 
-    // RESTAURADO: Buscar fotos de perfil
+    // RESTAURADO: Buscar fotos de perfil e presença inicial
     useEffect(() => {
-        const fetchPhotos = async () => {
+        const fetchData = async () => {
             if (!isConnected) return;
             for (const contact of groupedContacts) {
+                // Fotos
                 if (profilePics[contact.id] === undefined) {
                     try {
                         const res = await fetch(`${apiUrl}/api/foto?id=${encodeURIComponent(contact.rawId)}`);
@@ -223,10 +225,35 @@ const WhatsAppAICenter = () => {
                         }
                     } catch { }
                 }
+                // Presença (apenas se for o ativo ou a cada ciclo longo)
+                if (activeContact?.id === contact.id || presencas[contact.id] === undefined) {
+                    try {
+                        const res = await fetch(`${apiUrl}/api/presenca?id=${encodeURIComponent(contact.rawId)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            setPresencas(prev => ({ ...prev, [contact.id]: data }));
+                        }
+                    } catch { }
+                }
             }
         };
-        if (groupedContacts.length > 0) fetchPhotos();
-    }, [groupedContacts.length, isConnected, apiUrl]);
+        if (groupedContacts.length > 0) fetchData();
+    }, [groupedContacts.length, isConnected, apiUrl, activeContact?.id]);
+
+    // Polling de presença para o contato ativo (a cada 10s)
+    useEffect(() => {
+        if (!activeContact || !isConnected) return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`${apiUrl}/api/presenca?id=${encodeURIComponent(activeContact.rawId)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setPresencas(prev => ({ ...prev, [activeContact.id]: data }));
+                }
+            } catch { }
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [activeContact?.id, isConnected, apiUrl]);
 
     // Auto-scroll
     const scrollToBottom = (behavior: "smooth" | "auto" = "smooth") => {
@@ -329,7 +356,10 @@ const WhatsAppAICenter = () => {
                                                 ) : (
                                                     c.name.charAt(0).toUpperCase()
                                                 )}
-                                                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${iaStatus[c.rawId] ? 'bg-amber-400 pulse' : 'bg-emerald-500'}`} />
+                                                {/* Bolinha Verde Online */}
+                                                {presencas[c.id]?.isOnline && (
+                                                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+                                                )}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="text-xs font-bold truncate">{c.name}</h4>
@@ -357,9 +387,22 @@ const WhatsAppAICenter = () => {
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm">{activeContact.name}</h3>
-                                                    <p className={`text-[10px] font-bold ${iaStatus[activeContact.rawId] ? 'text-amber-500' : 'text-emerald-500'}`}>
-                                                        {iaStatus[activeContact.rawId] ? 'IA Gerenciando' : 'Humano'}
-                                                    </p>
+                                                    <div className="flex items-center gap-1.5">
+                                                        {presencas[activeContact.id]?.isOnline ? (
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                                                <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">Online agora</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-500 font-medium italic">
+                                                                {presencas[activeContact.id]?.lastSeen ? `visto por último às ${presencas[activeContact.id].lastSeen.split(' ')[1]}` : 'offline'}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-slate-300">|</span>
+                                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${iaStatus[activeContact.rawId] ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                                            {iaStatus[activeContact.rawId] ? 'IA Ativa' : 'Humano'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <button onClick={handleToggleIA} className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all ${iaStatus[activeContact.rawId] ? 'bg-amber-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}`}>

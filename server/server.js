@@ -178,6 +178,17 @@ app.get('/api/foto', async (req, res) => {
     try { res.json({ url: await client.getProfilePicUrl(req.query.id) }); } catch { res.json({ url: null }); }
 });
 
+app.get('/api/presenca', async (req, res) => {
+    try {
+        const contact = await client.getContactById(req.query.id);
+        const presence = await contact.getPresence();
+        res.json({
+            isOnline: presence.isOnline || false,
+            lastSeen: presence.lastSeen ? new Date(presence.lastSeen * 1000).toLocaleString('pt-BR') : null
+        });
+    } catch { res.json({ isOnline: false, lastSeen: null }); }
+});
+
 app.post('/api/enviar', async (req, res) => {
     try { await client.sendMessage(req.body.de_raw, req.body.mensagem); res.json({ ok: true }); } catch (e) { res.status(500).json({ error: e.message }); }
 });

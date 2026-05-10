@@ -15,7 +15,16 @@ import {
     Search,
     ChevronRight,
     TrendingUp,
-    Ghost
+    Ghost,
+    Smile,
+    Paperclip,
+    Mic,
+    Send,
+    Phone,
+    Video,
+    MoreVertical,
+    CheckCheck,
+    ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,35 +37,35 @@ import {
 import { Loader2 } from "lucide-react";
 import WhatsAppConnect from "./WhatsAppConnect";
 
-interface Conversation {
-    id: string;
-    leadName: string;
-    lastMessage: string;
-    time: string;
-    status: 'ai_processing' | 'human_needed' | 'closed';
-    sentiment: 'positive' | 'neutral' | 'negative';
-    objectionDetected?: string;
-}
 
-const MOCK_CONVERSATIONS: Conversation[] = [
-    { id: '1', leadName: 'Marcos Vinícius', lastMessage: 'Achei o valor um pouco alto para o meu orçamento.', time: 'agora', status: 'ai_processing', sentiment: 'neutral', objectionDetected: 'Preço/Orçamento' },
-    { id: '2', leadName: 'Cláudia Souza', lastMessage: 'Podemos agendar para amanhã às 14h?', time: '2m atrás', status: 'closed', sentiment: 'positive' },
-    { id: '3', leadName: 'Ricardo Alves', lastMessage: 'Gostaria de saber mais sobre as garantias.', time: '15m atrás', status: 'ai_processing', sentiment: 'neutral', objectionDetected: 'Segurança/Garantia' },
-    { id: '4', leadName: 'Juliana Lima', lastMessage: 'Vou falar com meu sócio e te retorno.', time: '1h atrás', status: 'human_needed', sentiment: 'neutral', objectionDetected: 'Decisor Terceiro' },
-    { id: '5', leadName: 'António Ferreira', lastMessage: 'Quais são as condições de financiamento?', time: '3h atrás', status: 'ai_processing', sentiment: 'positive', objectionDetected: 'Financiamento' },
-    { id: '6', leadName: 'Maria Silva', lastMessage: 'Obrigada pela explicação, ficou muito claro.', time: 'ontem', status: 'closed', sentiment: 'positive' },
-];
 
 const WhatsAppAICenter = () => {
     const [isConnected, setIsConnected] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
     const [qrStatus, setQrStatus] = useState<'loading' | 'ready' | 'connecting' | 'success'>('loading');
-    const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
     const [realMessages, setRealMessages] = useState<any[]>([]);
     const [apiUrl, setApiUrl] = useState("http://localhost:3001");
     const [isApiSyncing, setIsApiSyncing] = useState(false);
     const [backendQr, setBackendQr] = useState<string | null>(null);
+    const [activeContact, setActiveContact] = useState<any | null>(null);
+    const [inputMessage, setInputMessage] = useState("");
+
+    // Agrupar mensagens por contato (numero)
+    const groupedContacts = Object.values(realMessages.reduce((acc: any, msg: any) => {
+        const key = msg.de_raw || msg.de; // use raw ID as key for accuracy
+        if (!acc[key]) {
+            acc[key] = {
+                id: key,
+                number: msg.de,
+                rawId: msg.de_raw || msg.de, // full WhatsApp ID for sending
+                name: msg.nome || `+${msg.de}`,
+                messages: []
+            };
+        }
+        acc[key].messages.push(msg);
+        return acc;
+    }, {}));
 
     // Polling para o status da API e MENSAGENS REAIS
     useEffect(() => {
@@ -104,6 +113,42 @@ const WhatsAppAICenter = () => {
             }
         } catch (error) {
             toast.error("Erro ao tentar desconectar.");
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!inputMessage.trim() || !activeContact) return;
+
+        const text = inputMessage;
+        setInputMessage("");
+
+        // Optimistic UI - adiona localmente
+        const tempMsg = {
+            id: Date.now().toString(),
+            de: "me",
+            texto: text,
+            horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now() / 1000
+        };
+        setRealMessages(prev => [...prev, tempMsg]);
+
+        try {
+            const res = await fetch(`${apiUrl}/api/enviar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    numero: activeContact.number,
+                    de_raw: activeContact.rawId, // ID completo para envio seguro
+                    mensagem: text
+                })
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                toast.error(`Erro: ${errData.erro} - Detalhe: ${errData.detalhe || 'Nenhum'}`);
+                // Aqui poderia-mos remover o tempMsg em caso de erro
+            }
+        } catch (error: any) {
+            toast.error(`Falha de rede ao enviar: ${error.message}`);
         }
     };
 
@@ -190,83 +235,161 @@ const WhatsAppAICenter = () => {
                     </div>
                 </div>
 
-                {/* Live Conversation Monitor */}
-                <div className="lg:col-span-2 bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-border flex items-center justify-between bg-secondary/10">
-                        <h3 className="font-bold flex items-center gap-2 italic">
-                            <Zap className="w-4 h-4 text-amber-500" /> Monitoramento em Tempo Real (IA)
-                        </h3>
-                        <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-2 py-1 rounded-md">8 CONVERSAS ATIVAS</span>
-                    </div>
-                    <div className="divide-y divide-border">
-                        {/* Mensagens Reais do WhatsApp */}
-                        {realMessages.map((msg) => (
-                            <div key={msg.id} className="p-4 bg-emerald-50/30 hover:bg-emerald-50/50 transition-all group flex items-start gap-4 animate-in slide-in-from-right-4 duration-300">
-                                <div className="relative">
-                                    <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 font-bold text-lg">
-                                        {msg.de.charAt(0)}
-                                    </div>
-                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card bg-emerald-500 flex items-center justify-center">
-                                        <Sparkles className="w-2 h-2 text-white" />
-                                    </div>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h4 className="font-bold text-sm truncate">+{msg.de}</h4>
-                                        <span className="text-[10px] text-muted-foreground font-medium">{msg.horario}</span>
-                                    </div>
-                                    <p className="text-xs text-slate-700 truncate font-medium">"{msg.texto}"</p>
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200 uppercase">
-                                            IA Analisando...
-                                        </span>
-                                    </div>
+                {/* Live Conversation Monitor (Chat UI) */}
+                <div className="lg:col-span-2 bg-card rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col" style={{ minHeight: '600px' }}>
+
+                    {!isConnected ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center opacity-70 gap-4 animate-in fade-in zoom-in duration-500 p-12">
+                            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center relative shadow-inner">
+                                <MessageCircle className="w-10 h-10 text-emerald-600/50" />
+                                <div className="absolute top-0 right-0 w-6 h-6 bg-amber-400 rounded-full border-4 border-card flex items-center justify-center shadow-sm">
+                                    <Zap className="w-3 h-3 text-white" />
                                 </div>
                             </div>
-                        ))}
+                            <div>
+                                <h4 className="font-bold text-lg text-slate-700">Aguardando Conexão IA</h4>
+                                <p className="text-xs text-slate-500 mt-1 max-w-[250px] mx-auto leading-relaxed">
+                                    Conecte o seu WhatsApp ou verifique o painel lateral para começar a capturar leads em tempo real.
+                                </p>
+                            </div>
+                        </div>
+                    ) : realMessages.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-muted-foreground">
+                            <Ghost className="w-12 h-12 opacity-50" />
+                            <span className="text-sm font-medium">Nenhuma mensagem recente capturada.</span>
+                        </div>
+                    ) : (
+                        <div className="flex flex-1 h-full overflow-hidden">
 
-                        {/* Fim Mensagens Reais */}
-
-                        {conversations.map((conv) => (
-                            <div key={conv.id} className="p-4 hover:bg-secondary/20 transition-all group flex items-start gap-4">
-                                <div className="relative">
-                                    <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center text-teal-600 font-bold text-lg">
-                                        {conv.leadName.charAt(0)}
-                                    </div>
-                                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card flex items-center justify-center ${conv.sentiment === 'positive' ? 'bg-green-500' : conv.sentiment === 'neutral' ? 'bg-blue-500' : 'bg-red-500'
-                                        }`}>
-                                        <TrendsUp className="w-2 h-2 text-white" />
-                                    </div>
+                            {/* Left Pane: Contacts List */}
+                            <div className={`w-full md:w-1/3 border-r border-border flex flex-col bg-slate-50/30 ${activeContact ? 'hidden md:flex' : 'flex'}`}>
+                                <div className="p-4 border-b border-border bg-secondary/10 shrink-0">
+                                    <h3 className="font-bold flex items-center gap-2 text-sm italic">
+                                        <Zap className="w-4 h-4 text-amber-500" /> Monitores IA ({groupedContacts.length})
+                                    </h3>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h4 className="font-bold text-sm truncate">{conv.leadName}</h4>
-                                        <span className="text-[10px] text-muted-foreground font-medium">{conv.time}</span>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate italic">"{conv.lastMessage}"</p>
+                                <div className="flex-1 overflow-y-auto divide-y divide-border">
+                                    {groupedContacts.map((contact: any) => {
+                                        const lastMsg = contact.messages[contact.messages.length - 1];
+                                        return (
+                                            <div
+                                                key={contact.id}
+                                                onClick={() => setActiveContact(contact)}
+                                                className={`p-3 cursor-pointer transition-all flex items-start gap-3 hover:bg-emerald-50 ${activeContact?.id === contact.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}
+                                            >
+                                                <div className="w-10 h-10 bg-emerald-100 rounded-full shrink-0 flex items-center justify-center text-emerald-600 font-bold text-sm shadow-sm relative">
+                                                    {contact.name.charAt(0).toUpperCase()}
+                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-center mb-0.5">
+                                                        <h4 className="font-bold text-xs truncate text-slate-800">{contact.name}</h4>
+                                                        <span className="text-[9px] font-medium text-slate-400 shrink-0">{lastMsg?.horario}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 opacity-80">
+                                                        {lastMsg?.de === "me" && <CheckCheck className="w-3 h-3 text-emerald-500 shrink-0" />}
+                                                        <p className="text-[11px] text-slate-600 truncate">{lastMsg?.texto}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-                                    {conv.objectionDetected && (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 border border-orange-200 uppercase">
-                                                Objeção: {conv.objectionDetected}
-                                            </span>
-                                            <span className="text-[9px] font-bold text-emerald-600 flex items-center gap-1">
-                                                <Sparkles className="w-3 h-3" /> IA Resolvendo...
-                                            </span>
+                            {/* Right Pane: Active Chat */}
+                            <div className={`w-full md:w-2/3 flex flex-col bg-slate-50 bg-[url('https://i.ibb.co/L5hP3L4/wa-bg.png')] bg-cover bg-center bg-opacity-10 ${!activeContact ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
+                                {!activeContact ? (
+                                    <div className="flex flex-col items-center gap-4 opacity-50 p-6 text-center">
+                                        <MessageSquare className="w-16 h-16 text-emerald-600" />
+                                        <div>
+                                            <h3 className="font-bold text-xl text-slate-700">Selecione uma Conversa</h3>
+                                            <p className="text-xs text-slate-500 mt-1">O painel de monitoramento e interação do WhatsApp IA abrirá aqui.</p>
                                         </div>
-                                    )}
-                                </div>
-                                <div className="flex items-center self-center opacity-0 group-hover:opacity-100 transition-all">
-                                    <button className="p-2 text-primary hover:bg-primary/10 rounded-xl">
-                                        <ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Chat Header */}
+                                        <div className="h-16 px-4 bg-white border-b border-border flex items-center justify-between shrink-0 shadow-sm z-10">
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => setActiveContact(null)} className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full">
+                                                    <ArrowLeft className="w-5 h-5" />
+                                                </button>
+                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
+                                                    {activeContact.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-sm text-slate-800 leading-tight">{activeContact.name}</h3>
+                                                    <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                                        <Sparkles className="w-3 h-3" /> IA Monitorando...
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-slate-500">
+                                                <button className="p-2 hover:bg-slate-100 rounded-full ml-1"><Video className="w-5 h-5" /></button>
+                                                <button className="p-2 hover:bg-slate-100 rounded-full ml-1"><Phone className="w-5 h-5" /></button>
+                                                <span className="w-px h-6 bg-slate-200 mx-1"></span>
+                                                <button className="p-2 hover:bg-slate-100 rounded-full"><Search className="w-5 h-5" /></button>
+                                                <button className="p-2 hover:bg-slate-100 rounded-full"><MoreVertical className="w-5 h-5" /></button>
+                                            </div>
+                                        </div>
+
+                                        {/* Messages Area */}
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                            {activeContact.messages.map((msg: any) => {
+                                                const isMe = msg.de === "me";
+                                                return (
+                                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                        <div className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm relative ${isMe
+                                                            ? 'bg-emerald-100 text-emerald-950 rounded-tr-none'
+                                                            : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                                                            }`}>
+                                                            <p className="text-sm pb-2 whitespace-pre-wrap">{msg.texto}</p>
+                                                            <div className="flex items-center justify-end gap-1 absolute bottom-1 right-2">
+                                                                {isMe && <CheckCheck className="w-3 h-3 text-emerald-500" />}
+                                                                <span className="text-[9px] opacity-60 font-medium">{msg.horario}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Input Box - Standard WhatsApp */}
+                                        <div className="h-16 px-4 bg-slate-50 border-t border-border flex items-center gap-3 shrink-0">
+                                            <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors">
+                                                <Smile className="w-6 h-6" />
+                                            </button>
+                                            <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors mr-1">
+                                                <Paperclip className="w-5 h-5" />
+                                            </button>
+
+                                            <div className="flex-1 relative">
+                                                <input
+                                                    type="text"
+                                                    value={inputMessage}
+                                                    onChange={e => setInputMessage(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                                                    placeholder="Digite uma mensagem ou IA assumirá..."
+                                                    className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 shadow-sm rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                />
+                                            </div>
+
+                                            {inputMessage.trim() ? (
+                                                <button onClick={handleSendMessage} className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full transition-colors w-10 h-10 flex flex-col items-center justify-center shadow-md">
+                                                    <Send className="w-4 h-4 ml-0.5" />
+                                                </button>
+                                            ) : (
+                                                <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors w-10 h-10 flex flex-col items-center justify-center">
+                                                    <Mic className="w-6 h-6" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                        ))}
-                    </div>
-                    <button className="w-full py-3 bg-secondary/30 text-xs font-bold text-muted-foreground hover:bg-secondary transition-all">
-                        Ver Todas as Conversas
-                    </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -424,7 +547,7 @@ const WhatsAppAICenter = () => {
                     100% { top: 0; }
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 

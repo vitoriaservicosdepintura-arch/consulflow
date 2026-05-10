@@ -1,0 +1,5 @@
+node_modules
+server/node_modules
+server/.wwebjs_auth
+server/.wwebjs_cache
+dist

@@ -47,7 +47,7 @@ function getChromeExecutable() {
                 console.log('✅ Browser encontrado:', p);
                 return p;
             }
-        } catch {}
+        } catch { }
     }
 
     console.log('⚠️  Chrome não encontrado nos caminhos padrão. Usando Chromium do puppeteer.');
@@ -134,7 +134,8 @@ client.on('message', async (msg) => {
 
     mensagensRecebidas.unshift({
         id: msg.id.id,
-        de: msg.from.replace('@c.us', ''),
+        de: msg.from.replace('@c.us', '').replace('@lid', ''),
+        de_raw: msg.from,  // ID completo para envio confiável
         nome: nome,
         texto: msg.body,
         horario: new Date().toLocaleTimeString('pt-BR'),
@@ -194,7 +195,7 @@ app.get('/api/mensagens', (req, res) => {
 
 // Enviar mensagem
 app.post('/api/enviar', async (req, res) => {
-    const { numero, mensagem } = req.body;
+    const { numero, mensagem, de_raw } = req.body;
 
     if (!isConnected) {
         return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
@@ -204,10 +205,15 @@ app.post('/api/enviar', async (req, res) => {
     }
 
     try {
-        const numeroFormatado = numero.includes('@c.us') ? numero : `${numero.replace(/\D/g, '')}@c.us`;
-        await client.sendMessage(numeroFormatado, mensagem);
+        // Usa o de_raw se fornecido (contém @c.us ou @lid correto)
+        let destino = de_raw || numero;
+        if (!destino.includes('@')) {
+            destino = `${destino.replace(/\D/g, '')}@c.us`;
+        }
+        await client.sendMessage(destino, mensagem);
         res.json({ sucesso: true, mensagem: 'Mensagem enviada!' });
     } catch (erro) {
+        console.error('ERRO AO ENVIAR MENSAGEM:', erro);
         res.status(500).json({ erro: 'Falha ao enviar', detalhe: erro.message });
     }
 });

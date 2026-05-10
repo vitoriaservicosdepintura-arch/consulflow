@@ -141,15 +141,27 @@ app.post('/api/enviar', async (req, res) => {
 
 app.post('/api/desconectar', async (req, res) => {
     try {
-        await client.logout().catch(() => { });
-        await client.destroy().catch(() => { });
+        console.log("♻️ Solicitando desconexão profunda...");
+        if (client) {
+            await client.logout().catch(() => { });
+            await client.destroy().catch(() => { });
+        }
+
         const authPath = path.join(__dirname, '.wwebjs_auth');
-        if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
+        if (fs.existsSync(authPath)) {
+            try { fs.rmSync(authPath, { recursive: true, force: true }); } catch (err) { }
+        }
+
         isConnected = false; qrCodeData = ''; mensagensRecebidas = [];
         io.emit('status_update', { status: 'iniciando' });
         io.emit('init_messages', []);
+
         res.json({ ok: true });
-        setTimeout(initWhatsApp, 3000);
+
+        // Pequena pausa para garantir liberação de memória
+        setTimeout(() => {
+            initWhatsApp();
+        }, 5000);
     } catch (e) { res.status(500).send(); }
 });
 

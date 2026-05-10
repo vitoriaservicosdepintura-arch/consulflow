@@ -236,7 +236,15 @@ app.post('/api/enviar-midia', async (req, res) => {
 
 app.post('/api/desconectar', async (req, res) => {
     try {
+        console.log("🛑 Solicitando desconexão total...");
         await client.logout().catch(() => { });
+        await client.destroy().catch(() => { });
+
+        const authPath = path.join(__dirname, '.wwebjs_auth');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+        }
+
         isConnected = false;
         qrCodeData = '';
         mensagensRecebidas = [];
@@ -246,10 +254,10 @@ app.post('/api/desconectar', async (req, res) => {
         io.emit('status_update', { status: 'iniciando' });
         io.emit('init_messages', []);
 
-        // Tenta re-inicializar para o próximo login
-        client.initialize().catch(() => { });
-
         res.json({ ok: true });
+
+        console.log("♻️ Encerrando processo para limpeza total... O sistema irá reiniciar.");
+        setTimeout(() => process.exit(0), 1000);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

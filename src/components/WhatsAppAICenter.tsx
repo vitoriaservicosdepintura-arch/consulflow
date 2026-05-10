@@ -184,11 +184,15 @@ const WhatsAppAICenter = () => {
             }
         });
         socket.on("status_update", (data) => {
-            if (data.status === 'conectado') setIsConnected(true);
-            else if (data.status === 'aguardando_qr') {
+            if (data.status === 'conectado') {
+                setIsConnected(true);
+            } else {
                 setIsConnected(false);
-                setQrStatus('ready');
-                if (data.qr_code_imagem) setBackendQr(data.qr_code_imagem);
+                setRealMessages([]); // Limpa a lista da direita instantaneamente
+                if (data.status === 'aguardando_qr' && data.qr_code_imagem) {
+                    setQrStatus('ready');
+                    setBackendQr(data.qr_code_imagem);
+                }
             }
         });
 

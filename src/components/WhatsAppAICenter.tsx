@@ -51,6 +51,7 @@ const WhatsAppAICenter = () => {
     const [profilePics, setProfilePics] = useState<Record<string, string>>({});
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [iaStatus, setIaStatus] = useState<Record<string, boolean>>({});
+    const [isIASuggesting, setIsIASuggesting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Agrupar mensagens por contato (numero) – ignora mensagens temp enviadas ("me")
@@ -138,7 +139,31 @@ const WhatsAppAICenter = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [activeContact?.messages]);
+
+        // Lógica de Sugestão Automática da IA se estiver ativa para este contato
+        const getIASuggestion = async () => {
+            if (!activeContact || !iaStatus[activeContact.rawId]) return;
+            const lastMsg = activeContact.messages[activeContact.messages.length - 1];
+            if (!lastMsg || lastMsg.fromMe || inputMessage) return; // Só sugere se não tiver nada no input e a última for do cliente
+
+            setIsIASuggesting(true);
+            try {
+                const res = await fetch(`${apiUrl}/api/ia/sugerir?id_raw=${encodeURIComponent(activeContact.rawId)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.sugestao) {
+                        setInputMessage(data.sugestao);
+                        toast.info("A IA preparou uma resposta para você revisar!");
+                    }
+                }
+            } catch { } finally {
+                setIsIASuggesting(false);
+            }
+        };
+
+        const timer = setTimeout(getIASuggestion, 1000); // pequeno delay para deixar a msg assentar
+        return () => clearTimeout(timer);
+    }, [activeContact?.messages?.length, activeContact?.id]);
 
     const handleDisconnect = async () => {
         try {
@@ -504,9 +529,15 @@ const WhatsAppAICenter = () => {
                                                     value={inputMessage}
                                                     onChange={e => setInputMessage(e.target.value)}
                                                     onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                                                    placeholder="Digite uma mensagem ou IA assumirá..."
-                                                    className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 shadow-sm rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                    placeholder={isIASuggesting ? "🤖 IA gerando sugestão..." : "Digite uma mensagem ou IA assumirá..."}
+                                                    disabled={isIASuggesting}
+                                                    className={`w-full pl-4 pr-10 py-2.5 ${isIASuggesting ? 'bg-amber-50 animate-pulse' : 'bg-white'} border border-slate-200 shadow-sm rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20`}
                                                 />
+                                                {isIASuggesting && (
+                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                        <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {inputMessage.trim() ? (

@@ -228,56 +228,26 @@ client.on('message_create', async (msg) => {
     });
 
     // =============================================
-    // LÓGICA DE INTELIGÊNCIA ARTIFICIAL (IA)
+    // LÓGICA DE HISTÓRICO DA IA (Mantém Contexto)
     // =============================================
-    if (!msg.fromMe && iaAtivaPorContato[peerId]) {
-        try {
-            console.log(`🤖 IA pensando para ${nome}...`);
+    if (iaAtivaPorContato[peerId]) {
+        if (!chatHistoryIA[peerId]) {
+            chatHistoryIA[peerId] = [
+                { role: "system", content: "Você é a IA da SVG Multimídia. Você gerencia conversas no WhatsApp de forma natural, entende o contexto emocional e quebra objeções em tempo real. Seu objetivo é ser prestativo, humano e eficiente. Responda de forma curta e direta como se fosse o atendente real via WhatsApp. Nunca diga que é uma IA." }
+            ];
+        }
 
-            // Inicializa histórico se necessário
-            if (!chatHistoryIA[peerId]) {
-                chatHistoryIA[peerId] = [
-                    { role: "system", content: "Você é a IA da SVG Multimídia. Você gerencia conversas no WhatsApp de forma natural, entende o contexto emocional e quebra objeções em tempo real. Seu objetivo é ser prestativo, humano e eficiente. Responda de forma curta e direta como se fosse o atendente real via WhatsApp. Nunca diga que é uma IA." }
-                ];
-            }
+        // Adiciona a mensagem (do usuário ou minha) ao histórico para contexto
+        chatHistoryIA[peerId].push({
+            role: msg.fromMe ? "assistant" : "user",
+            content: msg.body
+        });
 
-            // Adiciona mensagem do usuário ao histórico
-            chatHistoryIA[peerId].push({ role: "user", content: msg.body });
+        // Mantém as últimas 15 mensagens
+        if (chatHistoryIA[peerId].length > 15) chatHistoryIA[peerId].splice(1, 1);
 
-            // Mantém apenas as últimas 15 mensagens de contexto
-            if (chatHistoryIA[peerId].length > 15) chatHistoryIA[peerId].splice(1, 1);
-
-            const openRouterKey = process.env.OPENROUTER_API_KEY;
-            if (!openRouterKey) throw new Error("Chave OpenRouter não configurada.");
-
-            const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-                model: "google/gemini-2.0-flash-001",
-                messages: chatHistoryIA[peerId],
-            }, {
-                headers: {
-                    "Authorization": `Bearer ${openRouterKey}`,
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:3000", // Opcional
-                    "X-Title": "Consuflow CRM" // Opcional
-                }
-            });
-
-            const respostaIA = response.data.choices[0].message.content;
-
-            // Simula digitação (opcional)
-            const chat = await msg.getChat();
-            await chat.sendStateTyping();
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Envia a resposta
-            await client.sendMessage(peerId, respostaIA);
-
-            // Adiciona resposta da IA ao histórico
-            chatHistoryIA[peerId].push({ role: "assistant", content: respostaIA });
-
-            console.log(`✅ IA respondeu a ${nome}: ${respostaIA}`);
-        } catch (err) {
-            console.error('❌ Erro na IA:', err.message);
+        if (!msg.fromMe) {
+            console.log(`🤖 IA capturou nova pergunta de ${nome}. Sugestão disponível no painel.`);
         }
     }
 
@@ -343,6 +313,34 @@ app.post('/api/ia/toggle', (req, res) => {
     if (!id_raw) return res.status(400).json({ erro: 'ID obrigatório.' });
     iaAtivaPorContato[id_raw] = !!enable;
     res.json({ sucesso: true, id_raw, ativa: iaAtivaPorContato[id_raw] });
+});
+
+// Endpoint para Sugestão de IA (Sem enviar)
+app.get('/api/ia/sugerir', async (req, res) => {
+    const { id_raw } = req.query;
+    if (!id_raw) return res.status(400).json({ erro: 'ID obrigatório.' });
+
+    try {
+        if (!chatHistoryIA[id_raw]) {
+            return res.json({ sugestao: "" });
+        }
+
+        const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+            model: "google/gemini-2.0-flash-001",
+            messages: chatHistoryIA[id_raw],
+        }, {
+            headers: {
+                "Authorization": `Bearer ${openRouterKey}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        const sugestao = response.data.choices[0].message.content;
+        res.json({ sugestao });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
 });
 
 // Foto de perfil

@@ -127,6 +127,25 @@ const WhatsAppAICenter = () => {
         init();
     }, [apiUrl]);
 
+    // RESTAURADO: Buscar fotos de perfil
+    useEffect(() => {
+        const fetchPhotos = async () => {
+            if (!isConnected) return;
+            for (const contact of groupedContacts) {
+                if (profilePics[contact.id] === undefined) {
+                    try {
+                        const res = await fetch(`${apiUrl}/api/foto?id=${encodeURIComponent(contact.rawId)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            setProfilePics(prev => ({ ...prev, [contact.id]: data.url || 'none' }));
+                        }
+                    } catch { }
+                }
+            }
+        };
+        if (groupedContacts.length > 0) fetchPhotos();
+    }, [groupedContacts.length, isConnected, apiUrl]);
+
     // Auto-scroll
     const scrollToBottom = (behavior: "smooth" | "auto" = "smooth") => {
         messagesEndRef.current?.scrollIntoView({ behavior });
@@ -222,9 +241,13 @@ const WhatsAppAICenter = () => {
                                 <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
                                     {groupedContacts.map((c: any) => (
                                         <div key={c.id} onClick={() => setActiveContact(c)} className={`p-4 cursor-pointer border-b transition-all flex gap-3 hover:bg-emerald-50 ${activeContact?.id === c.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}>
-                                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-700 relative">
-                                                {c.name.charAt(0).toUpperCase()}
-                                                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${iaStatus[c.id] ? 'bg-amber-400 pulse' : 'bg-emerald-500'}`} />
+                                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-700 relative overflow-hidden shrink-0">
+                                                {profilePics[c.id] && profilePics[c.id] !== 'none' ? (
+                                                    <img src={profilePics[c.id]} alt="PI" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    c.name.charAt(0).toUpperCase()
+                                                )}
+                                                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${iaStatus[c.rawId] ? 'bg-amber-400 pulse' : 'bg-emerald-500'}`} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="text-xs font-bold truncate">{c.name}</h4>
@@ -242,14 +265,22 @@ const WhatsAppAICenter = () => {
                                         <div className="h-16 px-4 bg-white border-b flex items-center justify-between shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 <button onClick={() => setActiveContact(null)} className="md:hidden"><ArrowLeft /></button>
-                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-600">{activeContact.name.charAt(0)}</div>
+                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-600 overflow-hidden">
+                                                    {profilePics[activeContact.id] && profilePics[activeContact.id] !== 'none' ? (
+                                                        <img src={profilePics[activeContact.id]} alt="Profile" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        activeContact.name.charAt(0).toUpperCase()
+                                                    )}
+                                                </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm">{activeContact.name}</h3>
-                                                    <p className="text-[10px] text-emerald-500 font-bold">{iaStatus[activeContact.id] ? 'IA Gerenciando' : 'Humano'}</p>
+                                                    <p className={`text-[10px] font-bold ${iaStatus[activeContact.rawId] ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                                        {iaStatus[activeContact.rawId] ? 'IA Gerenciando' : 'Humano'}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <button onClick={handleToggleIA} className={`px-4 py-1.5 rounded-full text-[10px] font-bold ${iaStatus[activeContact.id] ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                                                {iaStatus[activeContact.id] ? 'IA ATIVA' : 'ATIVAR IA'}
+                                            <button onClick={handleToggleIA} className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all ${iaStatus[activeContact.rawId] ? 'bg-amber-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}`}>
+                                                {iaStatus[activeContact.rawId] ? 'IA ATIVA' : 'ATIVAR IA'}
                                             </button>
                                         </div>
 

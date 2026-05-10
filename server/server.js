@@ -18,6 +18,27 @@ const io = new Server(server, {
     }
 });
 
+// Envia status atual para novos clientes que conectarem
+io.on('connection', (socket) => {
+    console.log('🔌 Novo cliente conectado via Socket');
+
+    // Status atual
+    const status = isConnected ? 'conectado' : (qrCodeData ? 'aguardando_qr' : 'iniciando');
+    const payload = { status };
+    if (qrCodeData) {
+        qrcode.toDataURL(qrCodeData).then(url => {
+            socket.emit('status_update', { ...payload, qr_code_imagem: url });
+        });
+    } else {
+        socket.emit('status_update', payload);
+    }
+
+    // Mensagens atuais
+    if (mensagensRecebidas.length > 0) {
+        socket.emit('init_messages', mensagensRecebidas);
+    }
+});
+
 // Impede o servidor Node de "crashar" por erros internos do Puppeteer/WhatsApp Web
 process.on('uncaughtException', (err) => {
     console.error('🚫 Erro fatal evitado:', err.message);

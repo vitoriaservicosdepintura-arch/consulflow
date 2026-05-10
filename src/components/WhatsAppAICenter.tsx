@@ -50,16 +50,20 @@ const WhatsAppAICenter = () => {
     const [backendQr, setBackendQr] = useState<string | null>(null);
     const [activeContact, setActiveContact] = useState<any | null>(null);
     const [inputMessage, setInputMessage] = useState("");
+    const [profilePics, setProfilePics] = useState<Record<string, string>>({});
 
-    // Agrupar mensagens por contato (numero)
+    // Agrupar mensagens por contato (numero) – ignora mensagens temp enviadas ("me")
     const groupedContacts = Object.values(realMessages.reduce((acc: any, msg: any) => {
-        const key = msg.de_raw || msg.de; // use raw ID as key for accuracy
+        if (msg.fromMe && !msg.de_raw) return acc; // skip orphan sent msgs
+        const key = msg.de_raw || msg.de;
+        if (key === 'me') return acc;
         if (!acc[key]) {
             acc[key] = {
                 id: key,
                 number: msg.de,
-                rawId: msg.de_raw || msg.de, // full WhatsApp ID for sending
+                rawId: msg.de_raw || msg.de,
                 name: msg.nome || `+${msg.de}`,
+                photo: null,
                 messages: []
             };
         }
@@ -103,6 +107,31 @@ const WhatsAppAICenter = () => {
         return () => clearInterval(interval);
     }, [apiUrl]);
 
+    // Buscar fotos de perfil
+    useEffect(() => {
+        const fetchPhotos = async () => {
+            if (!isConnected) return;
+            for (const contact of groupedContacts) {
+                if (profilePics[contact.id] === undefined) {
+                    try {
+                        const res = await fetch(`${apiUrl}/api/foto?id=${encodeURIComponent(contact.rawId)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            setProfilePics(prev => ({ ...prev, [contact.id]: data.url || 'none' }));
+                        }
+                    } catch { }
+                }
+            }
+        };
+        fetchPhotos();
+    }, [groupedContacts.length, isConnected, apiUrl]);
+
+    // Auto-scroll para a última mensagem
+    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [activeContact?.messages]);
+
     const handleDisconnect = async () => {
         try {
             const res = await fetch(`${apiUrl}/api/desconectar`, { method: 'POST' });
@@ -122,15 +151,20 @@ const WhatsAppAICenter = () => {
         const text = inputMessage;
         setInputMessage("");
 
-        // Optimistic UI - adiona localmente
+        // Optimistic UI - adiciona localmente na thread do contato ativo
         const tempMsg = {
             id: Date.now().toString(),
-            de: "me",
+            de: activeContact.number,
+            de_raw: activeContact.rawId,
+            fromMe: true,
+            nome: activeContact.name,
             texto: text,
             horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
             timestamp: Date.now() / 1000
         };
         setRealMessages(prev => [...prev, tempMsg]);
+        // Força re-sincronização do activeContact com o novo estado
+        setActiveContact((prev: any) => prev ? { ...prev } : prev);
 
         try {
             const res = await fetch(`${apiUrl}/api/enviar`, {
@@ -277,9 +311,13 @@ const WhatsAppAICenter = () => {
                                                 onClick={() => setActiveContact(contact)}
                                                 className={`p-3 cursor-pointer transition-all flex items-start gap-3 hover:bg-emerald-50 ${activeContact?.id === contact.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}
                                             >
-                                                <div className="w-10 h-10 bg-emerald-100 rounded-full shrink-0 flex items-center justify-center text-emerald-600 font-bold text-sm shadow-sm relative">
-                                                    {contact.name.charAt(0).toUpperCase()}
-                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+                                                <div className="w-10 h-10 bg-emerald-100 rounded-full shrink-0 flex items-center justify-center text-emerald-600 font-bold text-sm shadow-sm relative overflow-hidden">
+                                                    {profilePics[contact.id] && profilePics[contact.id] !== 'none' ? (
+                                                        <img src={profilePics[contact.id]} alt={contact.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        contact.name.charAt(0).toUpperCase()
+                                                    )}
+                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white z-10" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-center mb-0.5">
@@ -287,7 +325,7 @@ const WhatsAppAICenter = () => {
                                                         <span className="text-[9px] font-medium text-slate-400 shrink-0">{lastMsg?.horario}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1 opacity-80">
-                                                        {lastMsg?.de === "me" && <CheckCheck className="w-3 h-3 text-emerald-500 shrink-0" />}
+                                                        {lastMsg?.fromMe && <CheckCheck className="w-3 h-3 text-emerald-500 shrink-0" />}
                                                         <p className="text-[11px] text-slate-600 truncate">{lastMsg?.texto}</p>
                                                     </div>
                                                 </div>
@@ -315,8 +353,12 @@ const WhatsAppAICenter = () => {
                                                 <button onClick={() => setActiveContact(null)} className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full">
                                                     <ArrowLeft className="w-5 h-5" />
                                                 </button>
-                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
-                                                    {activeContact.name.charAt(0).toUpperCase()}
+                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold overflow-hidden shadow-sm">
+                                                    {profilePics[activeContact.id] && profilePics[activeContact.id] !== 'none' ? (
+                                                        <img src={profilePics[activeContact.id]} alt="Profile" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        activeContact.name.charAt(0).toUpperCase()
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm text-slate-800 leading-tight">{activeContact.name}</h3>
@@ -337,7 +379,7 @@ const WhatsAppAICenter = () => {
                                         {/* Messages Area */}
                                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                                             {activeContact.messages.map((msg: any) => {
-                                                const isMe = msg.de === "me";
+                                                const isMe = msg.fromMe === true;
                                                 return (
                                                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                                         <div className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm relative ${isMe
@@ -353,6 +395,7 @@ const WhatsAppAICenter = () => {
                                                     </div>
                                                 );
                                             })}
+                                            <div ref={messagesEndRef} />
                                         </div>
 
                                         {/* Input Box - Standard WhatsApp */}

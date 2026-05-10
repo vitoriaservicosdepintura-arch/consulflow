@@ -95,10 +95,63 @@ client.on('qr', async (qr) => {
     isConnected = false;
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
     console.log('✅ WhatsApp conectado com sucesso!');
     isConnected = true;
     qrCodeData = '';
+
+    // =============================================
+    // Carregar conversas existentes do WhatsApp
+    // =============================================
+    try {
+        console.log('📂 Carregando chats existentes...');
+        const chats = await client.getChats();
+
+        // Filtra grupos e pega os últimos 30 chats individuais
+        const individuais = chats
+            .filter(c => !c.isGroup)
+            .slice(0, 30);
+
+        const novasMensagens = [];
+
+        for (const chat of individuais) {
+            try {
+                const msgs = await chat.fetchMessages({ limit: 10 });
+                for (const msg of msgs) {
+                    if (!msg.body) continue;
+                    const contato = await msg.getContact().catch(() => null);
+                    const nome = contato?.pushname || contato?.name || chat.name || chat.id.user;
+
+                    novasMensagens.push({
+                        id: msg.id.id,
+                        de: msg.from.replace('@c.us', '').replace('@lid', ''),
+                        de_raw: msg.from,
+                        nome: nome,
+                        texto: msg.body,
+                        horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR'),
+                        timestamp: msg.timestamp
+                    });
+                }
+            } catch (e) {
+                // ignora erros em chats individuais
+            }
+        }
+
+        // Ordena do mais recente ao mais antigo
+        novasMensagens.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Mescla com mensagens reais capturadas ao vivo (evita duplicatas)
+        const idsExistentes = new Set(mensagensRecebidas.map(m => m.id));
+        for (const m of novasMensagens) {
+            if (!idsExistentes.has(m.id)) {
+                mensagensRecebidas.push(m);
+            }
+        }
+
+        console.log(`📂 ${novasMensagens.length} mensagens carregadas de ${individuais.length} chats.`);
+    } catch (err) {
+        console.error('⚠️ Erro ao carregar chats:', err.message);
+    }
 });
 
 client.on('authenticated', () => {
@@ -191,6 +244,19 @@ app.get('/api/status', async (req, res) => {
 // Mensagens recebidas
 app.get('/api/mensagens', (req, res) => {
     res.json(mensagensRecebidas);
+});
+
+// Foto de perfil
+app.get('/api/foto', async (req, res) => {
+    if (!isConnected) return res.json({ url: null });
+    const { id } = req.query;
+    if (!id) return res.json({ url: null });
+    try {
+        const url = await client.getProfilePicUrl(id);
+        res.json({ url });
+    } catch (error) {
+        res.json({ url: null });
+    }
 });
 
 // Enviar mensagem

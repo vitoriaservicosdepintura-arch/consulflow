@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     MessageSquare,
     Zap,
@@ -69,7 +69,7 @@ const WhatsAppAICenter = () => {
         }
         acc[key].messages.push(msg);
         return acc;
-    }, {}));
+    }, {})) as any[];
 
     // Polling para o status da API e MENSAGENS REAIS
     useEffect(() => {
@@ -127,7 +127,7 @@ const WhatsAppAICenter = () => {
     }, [groupedContacts.length, isConnected, apiUrl]);
 
     // Auto-scroll para a última mensagem
-    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [activeContact?.messages]);

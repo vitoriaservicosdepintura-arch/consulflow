@@ -26,8 +26,17 @@ let iaAtivaPorContato = {};
 let chatHistoryIA = {};
 let client;
 
+async function getStatus() {
+    if (isConnected) return { status: 'conectado' };
+    if (qrCodeData) {
+        const qrImage = await qrcode.toDataURL(qrCodeData);
+        return { status: 'aguardando_qr', qr_code_imagem: qrImage };
+    }
+    return { status: 'iniciando' };
+}
+
 function initWhatsApp() {
-    console.log("🛠️ Inicializando nova instância do WhatsApp...");
+    console.log("🛠️ Inicializando WhatsApp...");
     qrCodeData = '';
     isConnected = false;
 
@@ -35,54 +44,32 @@ function initWhatsApp() {
         authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
         puppeteer: {
             headless: true,
-            args: [
-                '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-                '--disable-gpu', '--no-zygote', '--no-first-run'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         }
     });
 
     client.on('qr', async (qr) => {
-        console.log("📲 Novo QR Code gerado!");
+        console.log("📲 QR Gerado");
         qrCodeData = qr;
         const qrImage = await qrcode.toDataURL(qr);
         io.emit('status_update', { status: 'aguardando_qr', qr_code_imagem: qrImage });
     });
 
-    client.on('ready', async () => {
-        console.log('✅ WhatsApp Pronto e Conectado!');
-        isConnected = true;
-        qrCodeData = '';
+    client.on('ready', () => {
+        console.log('✅ Pronto');
+        isConnected = true; qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
+    });
 
-        // Carga inicial leve
-        try {
-            const chats = await client.getChats();
-            const individuais = chats.filter(c => !c.isGroup).slice(0, 10);
-            for (const chat of individuais) {
-                const msgs = await chat.fetchMessages({ limit: 5 });
-                for (const msg of msgs) {
-                    const peerId = msg.fromMe ? msg.to : msg.from;
-                    mensagensRecebidas.push({
-                        id: msg.id.id,
-                        de_raw: peerId,
-                        fromMe: msg.fromMe,
-                        nome: chat.name || peerId,
-                        texto: msg.body || (msg.hasMedia ? `📎 [Mídia: ${msg.type}]` : ''),
-                        type: msg.type,
-                        hasMedia: msg.hasMedia,
-                        horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                        timestamp: msg.timestamp
-                    });
-                }
-            }
-            io.emit('init_messages', mensagensRecebidas);
-        } catch (e) { }
+    client.on('auth_failure', () => {
+        console.log('❌ Falha Auth');
+        qrCodeData = ''; isConnected = false;
+        io.emit('status_update', { status: 'erro' });
     });
 
     client.on('message_create', async (msg) => {
         const peerId = msg.fromMe ? msg.to : msg.from;
-        if (peerId.includes('@g.us') || msg.isStatus) return;
+        if (peerId.includes('@g.us')) return;
 
         const contato = await client.getContactById(peerId).catch(() => null);
         const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
@@ -109,50 +96,21 @@ function initWhatsApp() {
         };
 
         mensagensRecebidas.unshift(novaMsg);
-        if (mensagensRecebidas.length > 200) mensagensRecebidas.pop();
+        if (mensagensRecebidas.length > 100) mensagensRecebidas.pop();
         io.emit('nova_mensagem', novaMsg);
-        if (!msg.fromMe) io.emit('presenca_update', { id_raw: peerId, isOnline: true, lastSeen: null });
-
-        if (iaAtivaPorContato[peerId] && msg.body && !msg.fromMe) {
-            if (!chatHistoryIA[peerId]) chatHistoryIA[peerId] = [{ role: "system", content: "IA da SVG Multimídia. Resposta natural e curta." }];
-            chatHistoryIA[peerId].push({ role: "user", content: msg.body });
-            if (chatHistoryIA[peerId].length > 10) chatHistoryIA[peerId].splice(1, 1);
-            gerarSugestao(peerId);
-        }
     });
 
-    client.on('presence_update', (data) => {
-        const id = data.id?._serialized || data.id;
-        const isOnline = data.type === 'available' || data.type === 'typing';
-        io.emit('presenca_update', { id_raw: id, isOnline, lastSeen: !isOnline ? Date.now() / 1000 : null });
-    });
-
-    client.initialize().catch(err => {
-        console.error("❌ Falha crítica ao inicializar client:", err.message);
-        io.emit('status_update', { status: 'erro' });
-    });
+    client.initialize().catch(() => io.emit('status_update', { status: 'erro' }));
 }
 
-async function gerarSugestao(id_raw) {
-    try {
-        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "google/gemini-2.0-flash-001",
-            messages: chatHistoryIA[id_raw],
-        }, { headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}` } });
-        io.emit('ia_sugestao', { id_raw, sugestao: response.data.choices[0].message.content });
-    } catch (e) { }
-}
-
-app.get('/api/status', async (req, res) => {
-    const qrImage = qrCodeData ? await qrcode.toDataURL(qrCodeData) : null;
-    res.json({
-        status: isConnected ? 'conectado' : (qrCodeData ? 'aguardando_qr' : 'iniciando'),
-        qr_code_imagem: qrImage
-    });
+io.on('connection', async (socket) => {
+    socket.emit('status_update', await getStatus());
+    if (mensagensRecebidas.length > 0) socket.emit('init_messages', mensagensRecebidas);
 });
 
+app.get('/api/status', async (req, res) => res.json(await getStatus()));
 app.get('/api/mensagens', (req, res) => res.json(mensagensRecebidas));
-app.get('/api/ia/status', (req, res) => res.json(iaAtivaPorContato));
+
 app.post('/api/ia/toggle', (req, res) => {
     iaAtivaPorContato[req.body.id_raw] = !!req.body.enable;
     res.json({ ativa: iaAtivaPorContato[req.body.id_raw] });
@@ -183,35 +141,19 @@ app.post('/api/enviar', async (req, res) => {
 
 app.post('/api/desconectar', async (req, res) => {
     try {
-        console.log("🛑 Iniciando processo de desconexão profunda...");
-        io.emit('status_update', { status: 'iniciando' });
-
         await client.logout().catch(() => { });
         await client.destroy().catch(() => { });
-
         const authPath = path.join(__dirname, '.wwebjs_auth');
-        if (fs.existsSync(authPath)) {
-            try { fs.rmSync(authPath, { recursive: true, force: true }); } catch (e) { console.log("Pasta de auth ocupada, tentando prosseguir..."); }
-        }
-
-        isConnected = false;
-        qrCodeData = '';
-        mensagensRecebidas = [];
-        iaAtivaPorContato = {};
-        chatHistoryIA = {};
-
+        if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
+        isConnected = false; qrCodeData = ''; mensagensRecebidas = [];
+        io.emit('status_update', { status: 'iniciando' });
         io.emit('init_messages', []);
-
         res.json({ ok: true });
-
-        // Aguarda o Windows liberar o Puppeteer antes de abrir de novo
-        setTimeout(() => {
-            initWhatsApp();
-        }, 5000);
+        setTimeout(initWhatsApp, 3000);
     } catch (e) { res.status(500).send(); }
 });
 
 server.listen(3001, () => {
-    console.log('🚀 Servidor Backend Rodando na porta 3001');
+    console.log('🚀 Server ON 3001');
     initWhatsApp();
 });

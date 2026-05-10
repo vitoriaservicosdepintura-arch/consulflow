@@ -341,13 +341,14 @@ const WhatsAppAICenter = () => {
                             </div>
 
                             {/* Chat Area */}
-                            <div className="flex-1 flex flex-col bg-[url('https://i.ibb.co/L5hP3L4/wa-bg.png')] bg-opacity-5">
+                            <div className="flex-1 flex flex-col bg-[#e5ddd5] relative">
+                                <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
                                 {activeContact ? (
                                     <>
-                                        <div className="h-16 px-4 bg-white border-b flex items-center justify-between shadow-sm">
+                                        <div className="h-16 px-4 bg-[#f0f2f5] border-b flex items-center justify-between shadow-sm z-10">
                                             <div className="flex items-center gap-3">
                                                 <button onClick={() => setActiveContact(null)} className="md:hidden"><ArrowLeft /></button>
-                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-600 overflow-hidden">
+                                                <div className="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center font-bold text-white overflow-hidden shadow-sm">
                                                     {profilePics[activeContact.id] && profilePics[activeContact.id] !== 'none' ? (
                                                         <img src={profilePics[activeContact.id]} alt="Profile" className="w-full h-full object-cover" />
                                                     ) : (
@@ -366,7 +367,7 @@ const WhatsAppAICenter = () => {
                                             </button>
                                         </div>
 
-                                        <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 custom-scrollbar">
+                                        <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 custom-scrollbar relative z-10">
                                             {activeContact.messages.map((m: any, idx: number) => {
                                                 const isMe = m.fromMe === true;
                                                 const hasText = m.texto && m.texto.trim().length > 0 && !m.texto.startsWith('[Mídia:');
@@ -374,8 +375,8 @@ const WhatsAppAICenter = () => {
                                                 return (
                                                     <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                                         <div className={`max-w-[85%] rounded-2xl shadow-sm overflow-hidden flex flex-col ${isMe
-                                                            ? 'bg-emerald-600 text-white rounded-tr-none'
-                                                            : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                                                            ? 'bg-[#dcf8c6] text-[#303030] rounded-tr-none'
+                                                            : 'bg-white text-[#303030] rounded-tl-none border border-slate-100'
                                                             }`}>
 
                                                             {/* Renderização de Mídia Avançada */}
@@ -451,18 +452,18 @@ const WhatsAppAICenter = () => {
                                             <div ref={messagesEndRef} />
                                         </div>
 
-                                        <div className="h-16 px-4 bg-white border-t flex items-center gap-2">
-                                            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 text-slate-400"><Smile /></button>
+                                        <div className="h-16 px-4 bg-[#f0f2f5] border-t flex items-center gap-2 z-10">
+                                            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 text-slate-500 hover:bg-black/5 rounded-full transition-colors"><Smile /></button>
                                             <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                                            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400"><Paperclip /></button>
+                                            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-500 hover:bg-black/5 rounded-full transition-colors"><Paperclip /></button>
                                             <input
-                                                className="flex-1 bg-slate-50 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                                                className="flex-1 bg-white border-none rounded-full px-4 py-2 text-sm shadow-sm focus:ring-0"
                                                 placeholder="Digite sua mensagem..."
                                                 value={inputMessage}
                                                 onChange={e => setInputMessage(e.target.value)}
                                                 onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
                                             />
-                                            <button onClick={handleSendMessage} className="p-2 bg-emerald-500 text-white rounded-full"><Send className="w-4 h-4" /></button>
+                                            <button onClick={handleSendMessage} className="p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-md active:scale-95"><Send className="w-4 h-4" /></button>
                                         </div>
                                     </>
                                 ) : (

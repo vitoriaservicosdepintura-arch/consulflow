@@ -134,6 +134,15 @@ client.on('message_create', async (msg) => {
     if (mensagensRecebidas.length > 200) mensagensRecebidas.pop();
     io.emit('nova_mensagem', novaMsg);
 
+    // Forçar Online no painel ao receber mensagem
+    if (!msg.fromMe) {
+        io.emit('presenca_update', {
+            id_raw: peerId,
+            isOnline: true,
+            lastSeen: null
+        });
+    }
+
     // AI Context
     if (iaAtivaPorContato[peerId]) {
         if (!chatHistoryIA[peerId]) {
@@ -191,11 +200,20 @@ app.get('/api/foto', async (req, res) => {
 
 app.get('/api/presenca', async (req, res) => {
     try {
-        const contact = await client.getContactById(req.query.id);
+        const id = req.query.id;
+        const contact = await client.getContactById(id);
         const presence = await contact.getPresence();
+
+        // HEURÍSTICA: Se mandou mensagem a menos de 2 minutos, está online
+        const lastInMsg = mensagensRecebidas.find(m => m.de_raw === id && !m.fromMe);
+        const secsLastMsg = lastInMsg ? (Date.now() - (lastInMsg.timestamp * 1000)) / 1000 : 999999;
+
+        const isOnline = presence.isOnline || secsLastMsg < 120;
+        const lastSeenTs = presence.lastSeen ? presence.lastSeen * 1000 : (lastInMsg ? lastInMsg.timestamp * 1000 : null);
+
         res.json({
-            isOnline: presence.isOnline || false,
-            lastSeen: presence.lastSeen ? new Date(presence.lastSeen * 1000).toLocaleString('pt-BR') : null
+            isOnline: isOnline,
+            lastSeen: lastSeenTs ? new Date(lastSeenTs).toLocaleString('pt-BR') : null
         });
     } catch { res.json({ isOnline: false, lastSeen: null }); }
 });

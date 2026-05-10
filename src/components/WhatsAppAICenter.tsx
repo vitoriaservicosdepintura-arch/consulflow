@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
 import {
     MessageSquare,
     Zap,
@@ -73,47 +74,75 @@ const WhatsAppAICenter = () => {
         return acc;
     }, {})) as any[];
 
-    // Polling para o status da API e MENSAGENS REAIS
+    // Conexão Socket.io para TEMPO REAL
     useEffect(() => {
-        const checkStatus = async () => {
+        const socket = io(apiUrl);
+
+        socket.on("connect", () => console.log("✅ Socket Conectado"));
+
+        // 1. Receber novas mensagens instantâneas
+        socket.on("nova_mensagem", (msg) => {
+            setRealMessages(prev => {
+                // Evita duplicatas
+                if (prev.some(m => m.id === msg.id)) return prev;
+                return [msg, ...prev];
+            });
+        });
+
+        // 2. Receber mensagens iniciais
+        socket.on("init_messages", (msgs) => {
+            setRealMessages(msgs);
+        });
+
+        // 3. Receber sugestões da IA instantâneas
+        socket.on("ia_sugestao", (data) => {
+            if (activeContact && data.id_raw === activeContact.rawId) {
+                setInputMessage(data.sugestao);
+                setIsIASuggesting(false);
+                toast.info("A IA preparou uma resposta para você revisar!");
+            }
+        });
+
+        // 4. Status de Conexão
+        socket.on("status_update", (data) => {
+            if (data.status === 'conectado') {
+                setIsConnected(true);
+                setQrStatus('success');
+            } else if (data.status === 'aguardando_qr') {
+                setIsConnected(false);
+                setQrStatus('ready');
+                if (data.qr_code_imagem) setBackendQr(data.qr_code_imagem);
+            }
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [apiUrl, activeContact?.id]);
+
+    // Polling inicial fallback + inicialização de dados
+    useEffect(() => {
+        const initData = async () => {
             try {
-                // 1. Checar Status / QR
+                // Status e Mensagens (Fallback)
                 const statusRes = await fetch(`${apiUrl}/api/status`);
                 const statusData = await statusRes.json();
-
                 if (statusData.status === 'conectado') {
                     setIsConnected(true);
                     setQrStatus('success');
-                } else if (statusData.status === 'aguardando_qr') {
-                    setIsConnected(false);
-                    setQrStatus('ready');
-                    if (statusData.qr_code_imagem) {
-                        setBackendQr(statusData.qr_code_imagem);
-                    }
-                } else {
-                    setIsConnected(false);
                 }
 
-                // 2. Buscar Mensagens Reais
                 const msgRes = await fetch(`${apiUrl}/api/mensagens`);
-                if (msgRes.ok) {
-                    const messages = await msgRes.json();
-                    setRealMessages(messages);
-                }
+                if (msgRes.ok) setRealMessages(await msgRes.json());
 
-                // 3. Buscar Status da IA
+                // Status IA
                 const iaRes = await fetch(`${apiUrl}/api/ia/status`);
-                if (iaRes.ok) {
-                    const data = await iaRes.json();
-                    setIaStatus(data);
-                }
+                if (iaRes.ok) setIaStatus(await iaRes.json());
             } catch (error) {
-                console.error("Falha ao conectar à API:", error);
+                console.error("Erro na inicialização:", error);
             }
         };
-
-        const interval = setInterval(checkStatus, 3000);
-        return () => clearInterval(interval);
+        initData();
     }, [apiUrl]);
 
     // Buscar fotos de perfil
@@ -161,8 +190,14 @@ const WhatsAppAICenter = () => {
             }
         };
 
-        const timer = setTimeout(getIASuggestion, 1000); // pequeno delay para deixar a msg assentar
-        return () => clearTimeout(timer);
+        // Lógica de Sugestão Automática da IA removida daqui e movida para o Socket.io no backend
+        // Mas mantemos o indicador de rascunho se o cliente estiver escrevendo
+        if (activeContact && iaStatus[activeContact.rawId]) {
+            const lastMsg = activeContact.messages[activeContact.messages.length - 1];
+            if (lastMsg && !lastMsg.fromMe && !inputMessage) {
+                setIsIASuggesting(true);
+            }
+        }
     }, [activeContact?.messages?.length, activeContact?.id]);
 
     const handleDisconnect = async () => {

@@ -1,3 +1,4 @@
+◇ injected env (1) from .env // tip: ⌘ override existing { override: true }
 ✅ Browser encontrado: C:\Program Files\Google\Chrome\Application\chrome.exe
 🚀 Iniciando WhatsApp (tentativa 1)...
 ⚙️  Config de inicialização: {
@@ -30,4 +31,8 @@ Rotas disponíveis:
 🔐 Autenticado!
 ✅ WhatsApp conectado com sucesso!
 📂 Carregando chats existentes...
-📂 164 mensagens carregadas de 30 chats.
+📂 165 mensagens carregadas de 30 chats.
+🔌 IA ATIVADA para 85242903846925@lid
+📩 Nova msg de 85242903846925@lid. IA ATIVA, salvando histórico...
+💬 Mensagem de Pai: 
+💬 Mensagem de Pai: 

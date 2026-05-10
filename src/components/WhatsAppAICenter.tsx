@@ -40,6 +40,87 @@ import { Loader2 } from "lucide-react";
 import WhatsAppConnect from "./WhatsAppConnect";
 import EmojiPicker from 'emoji-picker-react';
 
+const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [playbackRate, setPlaybackRate] = useState(1);
+
+    const togglePlay = () => {
+        if (audioRef.current) {
+            if (isPlaying) audioRef.current.pause();
+            else audioRef.current.play();
+            setIsPlaying(!isPlaying);
+        }
+    };
+
+    const changeSpeed = () => {
+        const speeds = [1, 1.5, 2];
+        const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length];
+        setPlaybackRate(next);
+        if (audioRef.current) audioRef.current.playbackRate = next;
+    };
+
+    const formatTime = (time: number) => {
+        const mins = Math.floor(time / 60);
+        const secs = Math.floor(time % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    return (
+        <div className={`flex items-center gap-2 p-3 rounded-2xl min-w-[260px] ${isMe ? 'bg-emerald-700/40' : 'bg-slate-100'}`}>
+            <audio
+                ref={audioRef}
+                src={src}
+                onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
+                onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+                onEnded={() => setIsPlaying(false)}
+                className="hidden"
+            />
+
+            <button onClick={changeSpeed} className="w-8 h-8 flex items-center justify-center bg-black/10 hover:bg-black/20 rounded-full text-[10px] font-black shrink-0 transition-colors">
+                {playbackRate}x
+            </button>
+
+            <button onClick={togglePlay} className="w-10 h-10 flex items-center justify-center bg-transparent shrink-0">
+                {isPlaying ? (
+                    <div className="flex gap-1">
+                        <div className="w-1 h-4 bg-current rounded-full" />
+                        <div className="w-1 h-4 bg-current rounded-full" />
+                    </div>
+                ) : (
+                    <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[12px] border-l-current border-b-[8px] border-b-transparent ml-1" />
+                )}
+            </button>
+
+            <div className="flex-1 flex flex-col gap-1">
+                <div className="h-4 flex items-center gap-[2px]">
+                    {[...Array(24)].map((_, i) => {
+                        const progress = (currentTime / duration) * 24;
+                        const isActive = i <= progress;
+                        const height = 4 + Math.random() * 12;
+                        return (
+                            <div
+                                key={i}
+                                className={`w-[2px] rounded-full transition-all duration-300 ${isActive ? 'bg-current opacity-100' : 'bg-current opacity-30'}`}
+                                style={{ height: `${height}px` }}
+                            />
+                        );
+                    })}
+                </div>
+                <div className="flex justify-between text-[10px] font-bold opacity-60">
+                    <span>{formatTime(currentTime)}</span>
+                </div>
+            </div>
+
+            <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                <Mic className="w-4 h-4 text-emerald-500" />
+            </div>
+        </div>
+    );
+};
+
 const WhatsAppAICenter = () => {
     const [isConnected, setIsConnected] = useState(true);
     const [showQRModal, setShowQRModal] = useState(false);
@@ -56,6 +137,7 @@ const WhatsAppAICenter = () => {
     const [isIASuggesting, setIsIASuggesting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
 
     // Agrupar mensagens por contato
     const groupedContacts = Object.values(realMessages.reduce((acc: any, msg: any) => {
@@ -319,22 +401,10 @@ const WhatsAppAICenter = () => {
                                                                     )}
 
                                                                     {(m.type === 'audio' || m.type === 'ptt') && (
-                                                                        <div className={`p-4 ${isMe ? 'bg-emerald-700/30' : 'bg-slate-50'} flex flex-col gap-2 min-w-[240px]`}>
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="p-2 bg-emerald-500 rounded-full text-white">
-                                                                                    <Mic className="w-4 h-4" />
-                                                                                </div>
-                                                                                <div className="flex-1">
-                                                                                    <audio controls className="w-full h-8 brightness-90 contrast-125">
-                                                                                        <source src={`data:${m.media.mimetype};base64,${m.media.data}`} type={m.media.mimetype} />
-                                                                                    </audio>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="flex justify-between items-center px-1">
-                                                                                <span className="text-[9px] font-bold opacity-60 uppercase tracking-tighter">{m.type === 'ptt' ? 'Mensagem de voz' : 'Áudio'}</span>
-                                                                                <a href={`data:${m.media.mimetype};base64,${m.media.data}`} download={`audio-${m.id}.ogg`} className="text-[9px] font-bold underline opacity-60 hover:opacity-100">BAIXAR</a>
-                                                                            </div>
-                                                                        </div>
+                                                                        <AudioPlayer
+                                                                            src={`data:${m.media.mimetype};base64,${m.media.data}`}
+                                                                            isMe={isMe}
+                                                                        />
                                                                     )}
 
                                                                     {m.type === 'sticker' && (

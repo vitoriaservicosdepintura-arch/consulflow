@@ -521,18 +521,40 @@ const WhatsAppAICenter = () => {
 
                                         {/* Messages Area */}
                                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                            {activeContact.messages.map((msg: any) => {
+                                            {activeContact.messages.map((msg: any, idx: number) => {
                                                 const isMe = msg.fromMe === true;
                                                 return (
-                                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                        <div className={`max-w-[75%] rounded-2xl px-4 py-2 shadow-sm relative ${isMe
-                                                            ? 'bg-emerald-100 text-emerald-950 rounded-tr-none'
+                                                    <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm relative ${isMe
+                                                            ? 'bg-emerald-600 text-white rounded-tr-none'
                                                             : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
                                                             }`}>
-                                                            <p className="text-sm pb-2 whitespace-pre-wrap">{msg.texto}</p>
-                                                            <div className="flex items-center justify-end gap-1 absolute bottom-1 right-2">
-                                                                {isMe && <CheckCheck className="w-3 h-3 text-emerald-500" />}
-                                                                <span className="text-[9px] opacity-60 font-medium">{msg.horario}</span>
+
+                                                            {/* Mídia Render */}
+                                                            {msg.hasMedia && msg.media && (
+                                                                <div className="mb-2 overflow-hidden rounded-lg">
+                                                                    {msg.type === 'image' && (
+                                                                        <img src={`data:${msg.media.mimetype};base64,${msg.media.data}`} alt="Img" className="max-w-full cursor-pointer" onClick={() => window.open(`data:${msg.media.mimetype};base64,${msg.media.data}`, '_blank')} />
+                                                                    )}
+                                                                    {msg.type === 'video' && (
+                                                                        <video controls className="max-w-full"><source src={`data:${msg.media.mimetype};base64,${msg.media.data}`} type={msg.media.mimetype} /></video>
+                                                                    )}
+                                                                    {(msg.type === 'ptt' || msg.type === 'audio') && (
+                                                                        <audio controls className="w-full h-8"><source src={`data:${msg.media.mimetype};base64,${msg.media.data}`} type={msg.media.mimetype} /></audio>
+                                                                    )}
+                                                                    {msg.type === 'document' && (
+                                                                        <div className="flex items-center gap-2 p-2 bg-black/5 rounded">
+                                                                            <File className="w-5 h-5 text-emerald-500" />
+                                                                            <a href={`data:${msg.media.mimetype};base64,${msg.media.data}`} download={msg.media.filename} className="text-[10px] underline truncate">{msg.media.filename || 'Doc'}</a>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.texto}</p>
+                                                            <div className="flex items-center justify-end gap-1 mt-1 opacity-60">
+                                                                <span className="text-[9px] font-medium">{msg.horario}</span>
+                                                                {isMe && <CheckCheck className="w-3 h-3" />}
                                                             </div>
                                                         </div>
                                                     </div>

@@ -285,22 +285,99 @@ const WhatsAppAICenter = () => {
                                         </div>
 
                                         <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 custom-scrollbar">
-                                            {activeContact.messages.map((m: any, idx: number) => (
-                                                <div key={idx} className={`flex ${m.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                                    <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl shadow-sm ${m.fromMe ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border'}`}>
-                                                        {m.hasMedia && m.media && (
-                                                            <div className="mb-2 rounded-lg overflow-hidden border border-black/5">
-                                                                {m.type === 'image' && <img src={`data:${m.media.mimetype};base64,${m.media.data}`} className="max-w-full" onClick={() => window.open(`data:${m.media.mimetype};base64,${m.media.data}`)} />}
-                                                                {m.type === 'video' && <video controls className="max-w-full"><source src={`data:${m.media.mimetype};base64,${m.media.data}`} type={m.media.mimetype} /></video>}
-                                                                {(m.type === 'audio' || m.type === 'ptt') && <audio controls className="w-full h-8"><source src={`data:${m.media.mimetype};base64,${m.media.data}`} type={m.media.mimetype} /></audio>}
-                                                                {m.type === 'document' && <div className="p-2 bg-black/5 flex items-center gap-2"><File className="w-4 h-4" /><a href={`data:${m.media.mimetype};base64,${m.media.data}`} download={m.media.filename} className="text-[10px] underline">{m.media.filename || 'Doc'}</a></div>}
+                                            {activeContact.messages.map((m: any, idx: number) => {
+                                                const isMe = m.fromMe === true;
+                                                const hasText = m.texto && m.texto.trim().length > 0 && !m.texto.startsWith('[Mídia:');
+
+                                                return (
+                                                    <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                        <div className={`max-w-[85%] rounded-2xl shadow-sm overflow-hidden flex flex-col ${isMe
+                                                            ? 'bg-emerald-600 text-white rounded-tr-none'
+                                                            : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                                                            }`}>
+
+                                                            {/* Renderização de Mídia Avançada */}
+                                                            {m.hasMedia && m.media && (
+                                                                <div className="relative group overflow-hidden">
+                                                                    {m.type === 'image' && (
+                                                                        <div className="relative">
+                                                                            <img
+                                                                                src={`data:${m.media.mimetype};base64,${m.media.data}`}
+                                                                                className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                                                                onClick={() => window.open(`data:${m.media.mimetype};base64,${m.media.data}`, '_blank')}
+                                                                            />
+                                                                            <a href={`data:${m.media.mimetype};base64,${m.media.data}`} download={`imagem-${m.id}.png`} className="absolute top-2 right-2 p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <Send className="w-3 h-3 rotate-90" />
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {m.type === 'video' && (
+                                                                        <video controls className="max-w-full">
+                                                                            <source src={`data:${m.media.mimetype};base64,${m.media.data}`} type={m.media.mimetype} />
+                                                                        </video>
+                                                                    )}
+
+                                                                    {(m.type === 'audio' || m.type === 'ptt') && (
+                                                                        <div className={`p-4 ${isMe ? 'bg-emerald-700/30' : 'bg-slate-50'} flex flex-col gap-2 min-w-[240px]`}>
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className="p-2 bg-emerald-500 rounded-full text-white">
+                                                                                    <Mic className="w-4 h-4" />
+                                                                                </div>
+                                                                                <div className="flex-1">
+                                                                                    <audio controls className="w-full h-8 brightness-90 contrast-125">
+                                                                                        <source src={`data:${m.media.mimetype};base64,${m.media.data}`} type={m.media.mimetype} />
+                                                                                    </audio>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex justify-between items-center px-1">
+                                                                                <span className="text-[9px] font-bold opacity-60 uppercase tracking-tighter">{m.type === 'ptt' ? 'Mensagem de voz' : 'Áudio'}</span>
+                                                                                <a href={`data:${m.media.mimetype};base64,${m.media.data}`} download={`audio-${m.id}.ogg`} className="text-[9px] font-bold underline opacity-60 hover:opacity-100">BAIXAR</a>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {m.type === 'sticker' && (
+                                                                        <div className="p-2 flex justify-center">
+                                                                            <img src={`data:${m.media.mimetype};base64,${m.media.data}`} className="w-32 h-32 object-contain" />
+                                                                        </div>
+                                                                    )}
+
+                                                                    {m.type === 'document' && (
+                                                                        <div className={`p-4 flex items-center gap-4 ${isMe ? 'bg-white/10' : 'bg-slate-50'} border-b border-black/5`}>
+                                                                            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-sm">
+                                                                                <File className="w-5 h-5" />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <p className="text-xs font-bold truncate">{m.media.filename || 'Documento'}</p>
+                                                                                <p className="text-[10px] opacity-60 uppercase font-black">{m.media.mimetype.split('/')[1]}</p>
+                                                                            </div>
+                                                                            <a
+                                                                                href={`data:${m.media.mimetype};base64,${m.media.data}`}
+                                                                                download={m.media.filename || 'arquivo'}
+                                                                                className={`p-2 rounded-lg ${isMe ? 'hover:bg-white/20' : 'hover:bg-slate-200'} transition-colors`}
+                                                                            >
+                                                                                <Send className="w-4 h-4 rotate-90" />
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {hasText && (
+                                                                <div className="px-4 py-2.5">
+                                                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.texto}</p>
+                                                                </div>
+                                                            )}
+
+                                                            <div className={`px-4 pb-2 flex items-center justify-end gap-1 ${!hasText && m.hasMedia ? 'pt-1' : ''}`}>
+                                                                <span className="text-[9px] opacity-60 font-medium">{m.horario}</span>
+                                                                {isMe && <CheckCheck className="w-3 h-3" />}
                                                             </div>
-                                                        )}
-                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.texto}</p>
-                                                        <div className="text-[9px] opacity-60 text-right mt-1 font-medium">{m.horario}</div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                             <div ref={messagesEndRef} />
                                         </div>
 

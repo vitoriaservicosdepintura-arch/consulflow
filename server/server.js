@@ -1,9 +1,11 @@
 const express = require('express');
+require('dotenv').config();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 
 const app = express();
 
@@ -30,6 +32,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 let qrCodeData = '';
 let isConnected = false;
 let mensagensRecebidas = [];
+let iaAtivaPorContato = {}; // de_raw -> boolean
+let chatHistoryIA = {};    // de_raw -> [{role, content}]
 
 // ==========================================
 // DETECÇÃO AUTOMÁTICA DO CHROME / CHROMIUM
@@ -223,6 +227,60 @@ client.on('message_create', async (msg) => {
         timestamp: Date.now() / 1000
     });
 
+    // =============================================
+    // LÓGICA DE INTELIGÊNCIA ARTIFICIAL (IA)
+    // =============================================
+    if (!msg.fromMe && iaAtivaPorContato[peerId]) {
+        try {
+            console.log(`🤖 IA pensando para ${nome}...`);
+
+            // Inicializa histórico se necessário
+            if (!chatHistoryIA[peerId]) {
+                chatHistoryIA[peerId] = [
+                    { role: "system", content: "Você é a IA da SVG Multimídia. Você gerencia conversas no WhatsApp de forma natural, entende o contexto emocional e quebra objeções em tempo real. Seu objetivo é ser prestativo, humano e eficiente. Responda de forma curta e direta como se fosse o atendente real via WhatsApp. Nunca diga que é uma IA." }
+                ];
+            }
+
+            // Adiciona mensagem do usuário ao histórico
+            chatHistoryIA[peerId].push({ role: "user", content: msg.body });
+
+            // Mantém apenas as últimas 15 mensagens de contexto
+            if (chatHistoryIA[peerId].length > 15) chatHistoryIA[peerId].splice(1, 1);
+
+            const openRouterKey = process.env.OPENROUTER_API_KEY;
+            if (!openRouterKey) throw new Error("Chave OpenRouter não configurada.");
+
+            const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+                model: "google/gemini-2.0-flash-001",
+                messages: chatHistoryIA[peerId],
+            }, {
+                headers: {
+                    "Authorization": `Bearer ${openRouterKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "http://localhost:3000", // Opcional
+                    "X-Title": "Consuflow CRM" // Opcional
+                }
+            });
+
+            const respostaIA = response.data.choices[0].message.content;
+
+            // Simula digitação (opcional)
+            const chat = await msg.getChat();
+            await chat.sendStateTyping();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Envia a resposta
+            await client.sendMessage(peerId, respostaIA);
+
+            // Adiciona resposta da IA ao histórico
+            chatHistoryIA[peerId].push({ role: "assistant", content: respostaIA });
+
+            console.log(`✅ IA respondeu a ${nome}: ${respostaIA}`);
+        } catch (err) {
+            console.error('❌ Erro na IA:', err.message);
+        }
+    }
+
     // Limita a 100 mensagens
     if (mensagensRecebidas.length > 100) mensagensRecebidas.pop();
 });
@@ -273,6 +331,18 @@ app.get('/api/status', async (req, res) => {
 // Mensagens recebidas
 app.get('/api/mensagens', (req, res) => {
     res.json(mensagensRecebidas);
+});
+
+// Configuração de IA
+app.get('/api/ia/status', (req, res) => {
+    res.json(iaAtivaPorContato);
+});
+
+app.post('/api/ia/toggle', (req, res) => {
+    const { id_raw, enable } = req.body;
+    if (!id_raw) return res.status(400).json({ erro: 'ID obrigatório.' });
+    iaAtivaPorContato[id_raw] = !!enable;
+    res.json({ sucesso: true, id_raw, ativa: iaAtivaPorContato[id_raw] });
 });
 
 // Foto de perfil

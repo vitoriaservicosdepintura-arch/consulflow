@@ -50,6 +50,7 @@ const WhatsAppAICenter = () => {
     const [inputMessage, setInputMessage] = useState("");
     const [profilePics, setProfilePics] = useState<Record<string, string>>({});
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [iaStatus, setIaStatus] = useState<Record<string, boolean>>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Agrupar mensagens por contato (numero) – ignora mensagens temp enviadas ("me")
@@ -98,6 +99,13 @@ const WhatsAppAICenter = () => {
                     const messages = await msgRes.json();
                     setRealMessages(messages);
                 }
+
+                // 3. Buscar Status da IA
+                const iaRes = await fetch(`${apiUrl}/api/ia/status`);
+                if (iaRes.ok) {
+                    const data = await iaRes.json();
+                    setIaStatus(data);
+                }
             } catch (error) {
                 console.error("Falha ao conectar à API:", error);
             }
@@ -142,6 +150,25 @@ const WhatsAppAICenter = () => {
             }
         } catch (error) {
             toast.error("Erro ao tentar desconectar.");
+        }
+    };
+
+    const handleToggleIA = async () => {
+        if (!activeContact) return;
+        const currentStatus = !!iaStatus[activeContact.rawId];
+        try {
+            const res = await fetch(`${apiUrl}/api/ia/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_raw: activeContact.rawId, enable: !currentStatus })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setIaStatus(prev => ({ ...prev, [activeContact.rawId]: data.ativa }));
+                toast.success(data.ativa ? "IA Ativada para este contato!" : "IA Desativada.");
+            }
+        } catch (err) {
+            toast.error("Erro ao alternar IA.");
         }
     };
 
@@ -360,7 +387,7 @@ const WhatsAppAICenter = () => {
                                                     ) : (
                                                         contact.name.charAt(0).toUpperCase()
                                                     )}
-                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white z-10" />
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 ${iaStatus[contact.rawId] ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'} rounded-full border-2 border-white z-10`} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-center mb-0.5">
@@ -405,12 +432,25 @@ const WhatsAppAICenter = () => {
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm text-slate-800 leading-tight">{activeContact.name}</h3>
-                                                    <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                                                        <Sparkles className="w-3 h-3" /> IA Monitorando...
+                                                    <p className={`text-[10px] ${iaStatus[activeContact.rawId] ? 'text-amber-500 font-black' : 'text-slate-400'} flex items-center gap-1 transition-all`}>
+                                                        {iaStatus[activeContact.rawId] ? (
+                                                            <><Sparkles className="w-3 h-3 animate-spin-slow" /> IA Gerenciando Chat</>
+                                                        ) : (
+                                                            <>Aguardando Interação Humana</>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1 text-slate-500">
+                                                <button
+                                                    onClick={handleToggleIA}
+                                                    className={`mr-2 px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition-all ${iaStatus[activeContact.rawId]
+                                                        ? 'bg-amber-500 text-white shadow-lg shadow-amber-200'
+                                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                                >
+                                                    <Sparkles className={`w-3.5 h-3.5 ${iaStatus[activeContact.rawId] ? 'animate-pulse' : ''}`} />
+                                                    {iaStatus[activeContact.rawId] ? 'IA ATIVA' : 'ATIVAR IA'}
+                                                </button>
                                                 <button onClick={() => toast.info('Função de Vídeo via IA WhatsApp não disponível.')} className="p-2 hover:bg-slate-100 rounded-full ml-1"><Video className="w-5 h-5" /></button>
                                                 <button onClick={() => toast.info('Função de Ligação via IA WhatsApp não disponível.')} className="p-2 hover:bg-slate-100 rounded-full ml-1"><Phone className="w-5 h-5" /></button>
                                                 <span className="w-px h-6 bg-slate-200 mx-1"></span>

@@ -29,3 +29,5 @@ server/.wwebjs_auth
 server/.wwebjs_cache
 
 .vercel
+.env
+server/.env

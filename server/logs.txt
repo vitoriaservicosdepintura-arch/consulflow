@@ -26,4 +26,8 @@ Rotas disponíveis:
   POST http://localhost:3001/api/enviar
   POST http://localhost:3001/api/desconectar
 
-📱 Novo QR Code gerado! Escaneie no painel.
+⏳ CARREGANDO: 100% - WhatsApp
+🔐 Autenticado!
+✅ WhatsApp conectado com sucesso!
+📂 Carregando chats existentes...
+📂 164 mensagens carregadas de 30 chats.

@@ -1,0 +1,7 @@
+◇ injected env (1) from .env // tip: ⌘ suppress logs { quiet: true }
+🚀 Server Multimedia na 3001
+🔌 Novo cliente conectado
+✅ WhatsApp conectado!
+🔌 Novo cliente conectado
+🔌 Novo cliente conectado
+🔌 Novo cliente conectado

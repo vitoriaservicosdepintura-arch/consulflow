@@ -235,7 +235,22 @@ app.post('/api/enviar-midia', async (req, res) => {
 });
 
 app.post('/api/desconectar', async (req, res) => {
-    try { await client.logout(); isConnected = false; qrCodeData = ''; res.json({ ok: true }); } catch { res.status(500).send(); }
+    try {
+        await client.logout().catch(() => { });
+        isConnected = false;
+        qrCodeData = '';
+        mensagensRecebidas = [];
+        iaAtivaPorContato = {};
+        chatHistoryIA = {};
+
+        io.emit('status_update', { status: 'iniciando' });
+        io.emit('init_messages', []);
+
+        // Tenta re-inicializar para o próximo login
+        client.initialize().catch(() => { });
+
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 server.listen(3001, () => console.log('🚀 Server ON 3001'));

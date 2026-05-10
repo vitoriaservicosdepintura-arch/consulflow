@@ -10,6 +10,15 @@ const app = express();
 // ==========================================
 // CORS — permite o frontend em qualquer origem
 // ==========================================
+
+// Impede o servidor Node de "crashar" por erros internos do Puppeteer/WhatsApp Web
+process.on('uncaughtException', (err) => {
+    console.error('🚫 Erro fatal evitado:', err.message);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚫 Promessa não tratada evitada:', reason);
+});
+
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],

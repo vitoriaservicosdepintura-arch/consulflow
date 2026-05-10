@@ -197,7 +197,9 @@ const WhatsAppAICenter = () => {
                 ...prev,
                 [data.id_raw]: {
                     isOnline: data.isOnline,
-                    lastSeen: data.lastSeen ? new Date(data.lastSeen * 1000).toLocaleString('pt-BR') : prev[data.id_raw]?.lastSeen
+                    lastSeen: typeof data.lastSeen === 'number'
+                        ? `hoje às ${new Date(data.lastSeen * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                        : (data.lastSeen || prev[data.id_raw]?.lastSeen)
                 }
             }));
         });
@@ -251,7 +253,7 @@ const WhatsAppAICenter = () => {
         if (groupedContacts.length > 0) fetchData();
     }, [groupedContacts.length, isConnected, apiUrl, activeContact?.id]);
 
-    // Polling de presença para o contato ativo (a cada 10s)
+    // Polling de presença para o contato ativo (a cada 5s para ser real-time)
     useEffect(() => {
         if (!activeContact || !isConnected) return;
         const interval = setInterval(async () => {
@@ -262,7 +264,7 @@ const WhatsAppAICenter = () => {
                     setPresencas(prev => ({ ...prev, [activeContact.id]: data }));
                 }
             } catch { }
-        }, 10000);
+        }, 5000);
         return () => clearInterval(interval);
     }, [activeContact?.id, isConnected, apiUrl]);
 
@@ -401,15 +403,14 @@ const WhatsAppAICenter = () => {
                                                     <div className="flex items-center gap-1.5">
                                                         {presencas[activeContact.id]?.isOnline ? (
                                                             <div className="flex items-center gap-1">
-                                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                                                <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">Online agora</span>
+                                                                <span className="text-[11px] text-emerald-500 font-medium">online</span>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[10px] text-slate-500 font-medium italic">
-                                                                {presencas[activeContact.id]?.lastSeen ? `visto por último às ${presencas[activeContact.id].lastSeen.split(' ')[1]}` : 'offline'}
+                                                            <span className="text-[10px] text-slate-500 font-medium">
+                                                                {presencas[activeContact.id]?.lastSeen ? `visto por último ${presencas[activeContact.id].lastSeen}` : 'offline'}
                                                             </span>
                                                         )}
-                                                        <span className="text-slate-300">|</span>
+                                                        <span className="text-slate-300 text-[10px]">|</span>
                                                         <span className={`text-[10px] font-bold uppercase tracking-wider ${iaStatus[activeContact.rawId] ? 'text-amber-500' : 'text-emerald-500'}`}>
                                                             {iaStatus[activeContact.rawId] ? 'IA Ativa' : 'Humano'}
                                                         </span>

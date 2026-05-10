@@ -15,10 +15,10 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    maxHttpBufferSize: 1e8 // 100mb
 });
 
-// Impede o servidor Node de "crashar" por erros internos do Puppeteer/WhatsApp Web
 process.on('uncaughtException', (err) => {
     console.error('🚫 Erro fatal evitado:', err.message);
 });
@@ -37,8 +37,8 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 let qrCodeData = '';
 let isConnected = false;
 let mensagensRecebidas = [];
-let iaAtivaPorContato = {}; // de_raw -> boolean
-let chatHistoryIA = {};    // de_raw -> [{role, content}]
+let iaAtivaPorContato = {};
+let chatHistoryIA = {};
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
@@ -53,7 +53,6 @@ const client = new Client({
 });
 
 io.on('connection', (socket) => {
-    console.log('🔌 Novo cliente conectado');
     const status = isConnected ? 'conectado' : (qrCodeData ? 'aguardando_qr' : 'iniciando');
     socket.emit('status_update', { status });
     if (mensagensRecebidas.length > 0) socket.emit('init_messages', mensagensRecebidas);
@@ -70,7 +69,6 @@ client.on('ready', async () => {
     isConnected = true; qrCodeData = '';
     io.emit('status_update', { status: 'conectado' });
 
-    // Carga inicial leve (texto + tipos)
     try {
         const chats = await client.getChats();
         const individuais = chats.filter(c => !c.isGroup).slice(0, 15);
@@ -80,7 +78,6 @@ client.on('ready', async () => {
                 const peerId = msg.fromMe ? msg.to : msg.from;
                 mensagensRecebidas.push({
                     id: msg.id.id,
-                    de: peerId.replace('@c.us', ''),
                     de_raw: peerId,
                     fromMe: msg.fromMe,
                     nome: chat.name || peerId,
@@ -134,21 +131,15 @@ client.on('message_create', async (msg) => {
     if (mensagensRecebidas.length > 200) mensagensRecebidas.pop();
     io.emit('nova_mensagem', novaMsg);
 
-    // Forçar Online no painel ao receber mensagem
+    // Push Online instantâneo
     if (!msg.fromMe) {
-        io.emit('presenca_update', {
-            id_raw: peerId,
-            isOnline: true,
-            lastSeen: null
-        });
+        io.emit('presenca_update', { id_raw: peerId, isOnline: true, lastSeen: null });
     }
 
-    // AI Context
     if (iaAtivaPorContato[peerId]) {
         if (!chatHistoryIA[peerId]) {
             chatHistoryIA[peerId] = [{ role: "system", content: "Você é a IA da SVG Multimídia. Responda de forma natural, curta e direta via WhatsApp. Entenda emoções." }];
         }
-        // IA só lê o texto por enquanto
         if (msg.body) {
             chatHistoryIA[peerId].push({ role: msg.fromMe ? "assistant" : "user", content: msg.body });
             if (chatHistoryIA[peerId].length > 15) chatHistoryIA[peerId].splice(1, 1);
@@ -201,21 +192,33 @@ app.get('/api/foto', async (req, res) => {
 app.get('/api/presenca', async (req, res) => {
     try {
         const id = req.query.id;
+        // GATILHO: Inscrever na presença do contato para receber eventos
+        await client.subscribePresence(id).catch(() => { });
+
         const contact = await client.getContactById(id);
         const presence = await contact.getPresence();
 
-        // HEURÍSTICA: Se mandou mensagem a menos de 2 minutos, está online
-        const lastInMsg = mensagensRecebidas.find(m => m.de_raw === id && !m.fromMe);
-        const secsLastMsg = lastInMsg ? (Date.now() - (lastInMsg.timestamp * 1000)) / 1000 : 999999;
+        let lastSeenFormatted = null;
+        const now = new Date();
 
-        const isOnline = presence.isOnline || secsLastMsg < 120;
-        const lastSeenTs = presence.lastSeen ? presence.lastSeen * 1000 : (lastInMsg ? lastInMsg.timestamp * 1000 : null);
+        if (presence.lastSeen) {
+            const date = new Date(presence.lastSeen * 1000);
+            const isToday = date.toDateString() === now.toDateString();
+            const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            lastSeenFormatted = isToday ? `hoje às ${time}` : `em ${date.toLocaleDateString('pt-BR')} às ${time}`;
+        } else {
+            // Heurística baseada na última mensagem se a privacidade esconder o lastSeen
+            const lastInMsg = mensagensRecebidas.find(m => m.de_raw === id && !m.fromMe);
+            if (lastInMsg) {
+                const date = new Date(lastInMsg.timestamp * 1000);
+                const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                lastSeenFormatted = `hoje às ${time}`;
+            }
+        }
 
-        res.json({
-            isOnline: isOnline,
-            lastSeen: lastSeenTs ? new Date(lastSeenTs).toLocaleString('pt-BR') : null
-        });
-    } catch { res.json({ isOnline: false, lastSeen: null }); }
+        const isOnline = presence.type === 'available' || presence.isOnline === true;
+        res.json({ isOnline, lastSeen: lastSeenFormatted });
+    } catch (e) { res.json({ isOnline: false, lastSeen: null }); }
 });
 
 app.post('/api/enviar', async (req, res) => {
@@ -224,8 +227,8 @@ app.post('/api/enviar', async (req, res) => {
 
 app.post('/api/enviar-midia', async (req, res) => {
     try {
-        const pureBase64 = req.body.base64data.replace(/^data:([A-Za-z-+/]+);base64,/, '');
-        const media = new MessageMedia(req.body.mimetype, pureBase64, req.body.filename);
+        const pureBase = req.body.base64data.replace(/^data:([A-Za-z-+/]+);base64,/, '');
+        const media = new MessageMedia(req.body.mimetype, pureBase, req.body.filename);
         await client.sendMessage(req.body.de_raw, media, { caption: req.body.legend });
         res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -235,5 +238,5 @@ app.post('/api/desconectar', async (req, res) => {
     try { await client.logout(); isConnected = false; qrCodeData = ''; res.json({ ok: true }); } catch { res.status(500).send(); }
 });
 
-server.listen(3001, () => console.log('🚀 Server Multimedia na 3001'));
+server.listen(3001, () => console.log('🚀 Server ON 3001'));
 client.initialize();

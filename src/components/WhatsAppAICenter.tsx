@@ -191,6 +191,17 @@ const WhatsAppAICenter = () => {
                 if (data.qr_code_imagem) setBackendQr(data.qr_code_imagem);
             }
         });
+
+        socket.on("presenca_update", (data) => {
+            setPresencas(prev => ({
+                ...prev,
+                [data.id_raw]: {
+                    isOnline: data.isOnline,
+                    lastSeen: data.lastSeen ? new Date(data.lastSeen * 1000).toLocaleString('pt-BR') : prev[data.id_raw]?.lastSeen
+                }
+            }));
+        });
+
         return () => { socket.disconnect(); };
     }, [apiUrl, activeContact?.id]);
 

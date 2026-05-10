@@ -148,6 +148,17 @@ client.on('message_create', async (msg) => {
     }
 });
 
+client.on('presence_update', (data) => {
+    const id = data.id?._serialized || data.id;
+    if (!id) return;
+    const isOnline = data.type === 'available' || data.type === 'typing' || data.type === 'recording';
+    io.emit('presenca_update', {
+        id_raw: id,
+        isOnline: isOnline,
+        lastSeen: !isOnline ? Date.now() / 1000 : null
+    });
+});
+
 async function gerarSugestao(id_raw) {
     try {
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {

@@ -90,15 +90,22 @@ const clientConfig = {
 };
 
 // Só adiciona executablePath se encontrou o Chrome
-if (executablePath) {
+/* if (executablePath) {
     clientConfig.puppeteer.executablePath = executablePath;
-}
+} */
 
 const client = new Client(clientConfig);
 
 // ==========================================
 // EVENTOS DO CLIENTE
 // ==========================================
+client.on('loading_screen', (percent, message) => {
+    console.log(`⏳ CARREGANDO: ${percent}% - ${message}`);
+});
+
+client.on('change_state', state => {
+    console.log('🔄 ESTADO:', state);
+});
 client.on('qr', async (qr) => {
     console.log('📱 Novo QR Code gerado! Escaneie no painel.');
     qrCodeData = qr;
@@ -226,6 +233,7 @@ client.on('message_create', async (msg) => {
 async function startWhatsApp(tentativa = 1) {
     try {
         console.log(`🚀 Iniciando WhatsApp (tentativa ${tentativa})...`);
+        console.log('⚙️  Config de inicialização:', JSON.stringify(clientConfig.puppeteer, null, 2));
         await client.initialize();
     } catch (erro) {
         console.error(`❌ Erro na inicialização (tentativa ${tentativa}):`, erro.message);

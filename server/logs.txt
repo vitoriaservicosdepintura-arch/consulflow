@@ -1,0 +1,29 @@
+✅ Browser encontrado: C:\Program Files\Google\Chrome\Application\chrome.exe
+🚀 Iniciando WhatsApp (tentativa 1)...
+⚙️  Config de inicialização: {
+  "headless": true,
+  "args": [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-accelerated-2d-canvas",
+    "--no-first-run",
+    "--no-zygote",
+    "--disable-gpu",
+    "--disable-extensions",
+    "--disable-background-networking"
+  ],
+  "defaultViewport": null
+}
+
+╔════════════════════════════════════════╗
+║  Consuflow API rodando na porta 3001   ║
+╚════════════════════════════════════════╝
+
+Rotas disponíveis:
+  GET  http://localhost:3001/api/status
+  GET  http://localhost:3001/api/mensagens
+  POST http://localhost:3001/api/enviar
+  POST http://localhost:3001/api/desconectar
+
+📱 Novo QR Code gerado! Escaneie no painel.

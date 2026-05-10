@@ -270,7 +270,7 @@ const WhatsAppAICenter = () => {
                 </div>
 
                 {/* Live Conversation Monitor (Chat UI) */}
-                <div className="lg:col-span-2 bg-card rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col" style={{ minHeight: '600px' }}>
+                <div className="lg:col-span-2 bg-card rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col h-[700px]">
 
                     {!isConnected ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center opacity-70 gap-4 animate-in fade-in zoom-in duration-500 p-12">

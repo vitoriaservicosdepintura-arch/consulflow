@@ -119,16 +119,20 @@ client.on('ready', async () => {
                 const msgs = await chat.fetchMessages({ limit: 10 });
                 for (const msg of msgs) {
                     if (!msg.body) continue;
+                    const peerId = msg.fromMe ? msg.to : msg.from;
+
                     const contato = await msg.getContact().catch(() => null);
-                    const nome = contato?.pushname || contato?.name || chat.name || chat.id.user;
+                    // Use the chat name if it's the peer, otherwise fallback to contact pushes
+                    const nome = chat.name || contato?.pushname || contato?.name || peerId.replace('@c.us', '');
 
                     novasMensagens.push({
                         id: msg.id.id,
-                        de: msg.from.replace('@c.us', '').replace('@lid', ''),
-                        de_raw: msg.from,
+                        de: peerId.replace('@c.us', '').replace('@lid', ''),
+                        de_raw: peerId,
+                        fromMe: msg.fromMe,
                         nome: nome,
                         texto: msg.body,
-                        horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR'),
+                        horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                         timestamp: msg.timestamp
                     });
                 }
@@ -174,25 +178,32 @@ client.on('disconnected', (reason) => {
 });
 
 // ==========================================
-// RECEBER MENSAGENS
+// RECEBER MENSAGENS (TUDO)
 // ==========================================
-client.on('message', async (msg) => {
+client.on('message_create', async (msg) => {
     // Ignora mensagens de grupos
-    if (msg.from.includes('@g.us')) return;
+    const peerId = msg.fromMe ? msg.to : msg.from;
+    if (peerId.includes('@g.us')) return;
 
-    const contato = await msg.getContact().catch(() => null);
-    const nome = contato?.pushname || contato?.name || msg.from.replace('@c.us', '');
+    // Se a msg for status/broadcast ignora
+    if (msg.isStatus) return;
 
-    console.log(`💬 Mensagem de ${nome}: ${msg.body}`);
+    const contato = await client.getContactById(peerId).catch(() => null);
+    const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
+
+    if (!msg.fromMe) {
+        console.log(`💬 Mensagem de ${nome}: ${msg.body}`);
+    }
 
     mensagensRecebidas.unshift({
         id: msg.id.id,
-        de: msg.from.replace('@c.us', '').replace('@lid', ''),
-        de_raw: msg.from,  // ID completo para envio confiável
+        de: peerId.replace('@c.us', '').replace('@lid', ''),
+        de_raw: peerId,  // ID do PEER
+        fromMe: msg.fromMe,
         nome: nome,
         texto: msg.body,
-        horario: new Date().toLocaleTimeString('pt-BR'),
-        timestamp: Date.now()
+        horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now() / 1000
     });
 
     // Limita a 100 mensagens

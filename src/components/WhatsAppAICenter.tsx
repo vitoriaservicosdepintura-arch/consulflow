@@ -36,9 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import WhatsAppConnect from "./WhatsAppConnect";
-
-
-
+import EmojiPicker from 'emoji-picker-react';
 const WhatsAppAICenter = () => {
     const [isConnected, setIsConnected] = useState(true);
     const [isScanning, setIsScanning] = useState(false);
@@ -51,6 +49,8 @@ const WhatsAppAICenter = () => {
     const [activeContact, setActiveContact] = useState<any | null>(null);
     const [inputMessage, setInputMessage] = useState("");
     const [profilePics, setProfilePics] = useState<Record<string, string>>({});
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Agrupar mensagens por contato (numero) – ignora mensagens temp enviadas ("me")
     const groupedContacts = Object.values(realMessages.reduce((acc: any, msg: any) => {
@@ -184,6 +184,49 @@ const WhatsAppAICenter = () => {
         } catch (error: any) {
             toast.error(`Falha de rede ao enviar: ${error.message}`);
         }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (!activeContact) return;
+
+        const reader = new FileReader();
+        reader.onload = async () => {
+            const base64data = reader.result as string;
+
+            const tempMsg = {
+                id: `temp-${Date.now()}`,
+                de_raw: activeContact.rawId,
+                de: activeContact.number,
+                nome: "Eu",
+                texto: `📷 Arquivo de mídia: ${file.name}`,
+                fromMe: true,
+                horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now() / 1000
+            };
+            setRealMessages(prev => [...prev, tempMsg]);
+
+            try {
+                const res = await fetch(`${apiUrl}/api/enviar-midia`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        numero: activeContact.number,
+                        de_raw: activeContact.rawId,
+                        base64data,
+                        mimetype: file.type,
+                        filename: file.name,
+                        legend: ''
+                    })
+                });
+                if (!res.ok) throw new Error();
+                toast.success("Mídia enviada!");
+            } catch (err) {
+                toast.error("Erro ao enviar mídia.");
+            }
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleSyncApi = () => {
@@ -368,11 +411,11 @@ const WhatsAppAICenter = () => {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1 text-slate-500">
-                                                <button className="p-2 hover:bg-slate-100 rounded-full ml-1"><Video className="w-5 h-5" /></button>
-                                                <button className="p-2 hover:bg-slate-100 rounded-full ml-1"><Phone className="w-5 h-5" /></button>
+                                                <button onClick={() => toast.info('Função de Vídeo via IA WhatsApp não disponível.')} className="p-2 hover:bg-slate-100 rounded-full ml-1"><Video className="w-5 h-5" /></button>
+                                                <button onClick={() => toast.info('Função de Ligação via IA WhatsApp não disponível.')} className="p-2 hover:bg-slate-100 rounded-full ml-1"><Phone className="w-5 h-5" /></button>
                                                 <span className="w-px h-6 bg-slate-200 mx-1"></span>
-                                                <button className="p-2 hover:bg-slate-100 rounded-full"><Search className="w-5 h-5" /></button>
-                                                <button className="p-2 hover:bg-slate-100 rounded-full"><MoreVertical className="w-5 h-5" /></button>
+                                                <button onClick={() => toast.info('O motor de busca em chats será ativado na próxima build.')} className="p-2 hover:bg-slate-100 rounded-full"><Search className="w-5 h-5" /></button>
+                                                <button onClick={() => toast.info('Configurações extras de contato sob desenvolvimento.')} className="p-2 hover:bg-slate-100 rounded-full"><MoreVertical className="w-5 h-5" /></button>
                                             </div>
                                         </div>
 
@@ -399,11 +442,19 @@ const WhatsAppAICenter = () => {
                                         </div>
 
                                         {/* Input Box - Standard WhatsApp */}
-                                        <div className="h-16 px-4 bg-slate-50 border-t border-border flex items-center gap-3 shrink-0">
-                                            <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors">
+                                        <div className="h-16 px-4 bg-slate-50 border-t border-border flex items-center gap-3 shrink-0 relative">
+                                            {showEmojiPicker && (
+                                                <div className="absolute bottom-20 left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-border">
+                                                    <EmojiPicker onEmojiClick={(emojiData) => setInputMessage(prev => prev + emojiData.emoji)} />
+                                                </div>
+                                            )}
+
+                                            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`p-2 hover:bg-slate-200 rounded-full transition-colors ${showEmojiPicker ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                                 <Smile className="w-6 h-6" />
                                             </button>
-                                            <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors mr-1">
+
+                                            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                                            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors mr-1">
                                                 <Paperclip className="w-5 h-5" />
                                             </button>
 
@@ -423,7 +474,7 @@ const WhatsAppAICenter = () => {
                                                     <Send className="w-4 h-4 ml-0.5" />
                                                 </button>
                                             ) : (
-                                                <button className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors w-10 h-10 flex flex-col items-center justify-center">
+                                                <button onClick={() => toast.info("Áudios de voz pela Web ainda estão em testes.")} className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors w-10 h-10 flex flex-col items-center justify-center">
                                                     <Mic className="w-6 h-6" />
                                                 </button>
                                             )}

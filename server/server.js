@@ -1,5 +1,5 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const cors = require('cors');
 const path = require('path');
@@ -15,7 +15,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let qrCodeData = '';
 let isConnected = false;
@@ -267,6 +268,33 @@ app.get('/api/foto', async (req, res) => {
         res.json({ url });
     } catch (error) {
         res.json({ url: null });
+    }
+});
+
+// Enviar interface rica (Midia)
+app.post('/api/enviar-midia', async (req, res) => {
+    const { numero, de_raw, base64data, mimetype, filename, legend } = req.body;
+
+    if (!isConnected) return res.status(400).json({ erro: 'WhatsApp não está conectado.' });
+    if (!base64data || !mimetype) return res.status(400).json({ erro: 'Base64 e mimetype obrigatórios.' });
+
+    try {
+        let destino = de_raw || numero;
+        if (!destino.includes('@')) {
+            destino = `${destino.replace(/\D/g, '')}@c.us`;
+        }
+
+        // Limpa cabeçalho base64 data:image/png;base64, (se existir)
+        const pureBase64 = base64data.replace(/^data:([A-Za-z-+/]+);base64,/, '');
+
+        const media = new MessageMedia(mimetype, pureBase64, filename || 'arquivo');
+
+        await client.sendMessage(destino, media, { caption: legend });
+
+        res.json({ sucesso: true, mensagem: 'Mídia enviada com sucesso!' });
+    } catch (erro) {
+        console.error('ERRO AO ENVIAR MÍDIA:', erro);
+        res.status(500).json({ erro: 'Falha ao enviar mídia', detalhe: erro.message });
     }
 });
 

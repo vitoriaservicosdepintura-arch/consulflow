@@ -122,61 +122,48 @@ function initWhatsApp() {
     });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp Pronto e Conectado!');
+        console.log('✅ WhatsApp PRONTO E CONECTADO!');
         isConnected = true;
         qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
 
-        try {
-            console.log("🔄 Iniciando sincronização massiva de contatos e mensagens...");
+        // Atraso necessário para o WhatsApp Web carregar o banco de dados interno
+        console.log("⏳ Aguardando 10 segundos para estabilizar a agenda...");
+        setTimeout(async () => {
+            try {
+                const chats = await client.getChats();
+                const contacts = await client.getContacts();
+                console.log(`📂 Chats: ${chats.length} | 👥 Agenda: ${contacts.length}`);
 
-            // 1. Buscar todos os CHATS (conversas ativas)
-            const chats = await client.getChats();
-            console.log(`📂 Total de chats encontrados: ${chats.length}`);
-
-            // 2. Buscar todos os CONTATOS (agenda completa)
-            const contacts = await client.getContacts();
-            console.log(`👥 Total de contatos na agenda: ${contacts.length}`);
-
-            const cacheFotos = {};
-
-            // Sincronizar mensagens dos chats mais recentes (Top 50 para não pesar demais o boot)
-            const syncChats = chats.slice(0, 50);
-            for (const chat of syncChats) {
-                const peerId = chat.id._serialized;
-                if (peerId.includes('@g.us')) continue;
-
-                client.subscribePresence(peerId).catch(() => { });
-
-                if (!cacheFotos[peerId]) {
-                    cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
+                const cacheFotos = {};
+                const syncChats = chats.slice(0, 100);
+                for (const chat of syncChats) {
+                    const peerId = chat.id._serialized;
+                    if (peerId.includes('@g.us')) continue;
+                    client.subscribePresence(peerId).catch(() => { });
+                    if (!cacheFotos[peerId]) {
+                        cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
+                    }
+                    const messages = await chat.fetchMessages({ limit: 3 });
+                    for (const msg of messages) {
+                        await processarMensagemSync(msg, cacheFotos[peerId]);
+                    }
                 }
 
-                const messages = await chat.fetchMessages({ limit: 3 });
-                for (const msg of messages) {
-                    await processarMensagemSync(msg, cacheFotos[peerId]);
-                }
-            }
+                const simplifiedContacts = contacts
+                    .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                    .map(c => ({
+                        id: c.id._serialized,
+                        name: c.name || c.pushname || c.number || "Sem Nome",
+                        number: c.number || (c.id ? c.id.user : ""),
+                        foto: null
+                    }));
 
-            // Filtrar contatos (ignorar grupos e IDs inválidos)
-            const simplifiedContacts = contacts
-                .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                .map(c => ({
-                    id: c.id._serialized,
-                    name: c.name || c.pushname || c.number || "Sem Nome",
-                    number: c.number || (c.id ? c.id.user : ""),
-                    foto: null
-                }));
-
-            console.log(`✅ Sync concluído: ${mensagensRecebidas.length} msgs e ${simplifiedContacts.length} contatos enviados.`);
-
-            io.emit('init_messages', mensagensRecebidas);
-            io.emit('init_contacts', simplifiedContacts);
-
-        } catch (err) {
-            console.error("❌ Erro crítico na sincronização:", err);
-            io.emit('init_messages', mensagensRecebidas);
-        }
+                console.log(`✅ SYNC FINALIZADO: ${mensagensRecebidas.length} msgs | ${simplifiedContacts.length} contatos.`);
+                io.emit('init_messages', mensagensRecebidas);
+                io.emit('init_contacts', simplifiedContacts);
+            } catch (err) { console.error("Erro no sync atrasado:", err); }
+        }, 10000);
     });
 
     async function processarMensagemSync(msg, fotoUrl) {

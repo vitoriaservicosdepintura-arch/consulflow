@@ -394,43 +394,35 @@ const WhatsAppAICenter = () => {
                 <div className="lg:col-span-2 bg-card rounded-[2rem] border border-border shadow-sm overflow-hidden flex flex-col h-[700px]">
                     {!isConnected ? (
                         <div className="flex-1 flex flex-col items-center justify-center opacity-50"><Loader2 className="w-12 h-12 animate-spin mb-4" /><p className="font-bold">Aguardando Conexão...</p></div>
-                    ) : groupedContacts.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                            <Ghost className="w-12 h-12 mb-4" />
-                            <p className="font-medium">Carregando contatos da agenda...</p>
-                            <p className="text-xs opacity-60">Isso pode levar alguns segundos após conectar.</p>
-                        </div>
                     ) : (
                         <div className="flex flex-1 overflow-hidden">
                             {/* Contact List */}
-                            {isConnected && (
-                                <div className={`w-1/3 border-r border-border flex flex-col bg-slate-50/50 overscroll-contain ${activeContact ? 'hidden md:flex' : ''}`}>
-                                    <div className="p-4 border-b bg-white italic font-bold text-xs flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /> Monitores Ativos</div>
-                                    <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
-                                        {groupedContacts.map((c: any) => (
-                                            <div key={c.id} onClick={() => setActiveContact(c)} className={`p-4 cursor-pointer border-b transition-all flex gap-3 hover:bg-emerald-50 ${activeContact?.id === c.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}>
-                                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-700 relative overflow-hidden shrink-0">
-                                                    {c.photo ? (
-                                                        <img src={c.photo} alt="PI" className="w-full h-full object-cover" />
-                                                    ) : profilePics[c.id] && profilePics[c.id] !== 'none' ? (
-                                                        <img src={profilePics[c.id]} alt="PI" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        c.name.charAt(0).toUpperCase()
-                                                    )}
-                                                    {/* Bolinha Verde Online */}
-                                                    {presencas[c.id]?.isOnline && (
-                                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="text-xs font-bold truncate">{c.name}</h4>
-                                                    <p className="text-[10px] text-slate-500 truncate">{c.messages[c.messages.length - 1]?.texto}</p>
-                                                </div>
+                            <div className={`w-1/3 border-r border-border flex flex-col bg-slate-50/50 overscroll-contain ${activeContact ? 'hidden md:flex' : ''}`}>
+                                <div className="p-4 border-b bg-white italic font-bold text-xs flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /> Monitores Ativos</div>
+                                <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
+                                    {groupedContacts.map((c: any) => (
+                                        <div key={c.id} onClick={() => setActiveContact(c)} className={`p-4 cursor-pointer border-b transition-all flex gap-3 hover:bg-emerald-50 ${activeContact?.id === c.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}>
+                                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-700 relative overflow-hidden shrink-0">
+                                                {c.photo ? (
+                                                    <img src={c.photo} alt="PI" className="w-full h-full object-cover" />
+                                                ) : profilePics[c.id] && profilePics[c.id] !== 'none' ? (
+                                                    <img src={profilePics[c.id]} alt="PI" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    c.name.charAt(0).toUpperCase()
+                                                )}
+                                                {/* Bolinha Verde Online */}
+                                                {presencas[c.id]?.isOnline && (
+                                                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+                                                )}
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-xs font-bold truncate">{c.name}</h4>
+                                                <p className="text-[10px] text-slate-500 truncate">{c.messages[c.messages.length - 1]?.texto}</p>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
 
                             {/* Chat Area */}
                             <div className="flex-1 flex flex-col bg-[#e5ddd5] relative">

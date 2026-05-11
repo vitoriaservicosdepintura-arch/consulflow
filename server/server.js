@@ -127,29 +127,34 @@ function initWhatsApp() {
         qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
 
-        // Atraso necessário para o WhatsApp Web carregar o banco de dados interno
-        console.log("⏳ Aguardando 10 segundos para estabilizar a agenda...");
+        // Fase 1: Sincronização Instantânea (Chats Ativos)
+        try {
+            console.log("⚡ Fase 1: Sincronizando chats ativos...");
+            const chats = await client.getChats();
+            const syncChats = chats.slice(0, 40);
+
+            const cacheFotos = {};
+            for (const chat of syncChats) {
+                const peerId = chat.id._serialized;
+                if (peerId.includes('@g.us')) continue;
+                if (!cacheFotos[peerId]) {
+                    cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
+                }
+                const messages = await chat.fetchMessages({ limit: 3 });
+                for (const msg of messages) {
+                    await processarMensagemSync(msg, cacheFotos[peerId]);
+                }
+            }
+            io.emit('init_messages', mensagensRecebidas);
+            console.log(`✅ Fase 1 concluída: ${mensagensRecebidas.length} msgs carregadas.`);
+        } catch (err) { console.error("Erro na Fase 1:", err); }
+
+        // Fase 2: Agenda Completa (Atrasada para estabilização)
+        console.log("⏳ Aguardando 10s para Fase 2 (Agenda)...");
         setTimeout(async () => {
             try {
-                const chats = await client.getChats();
+                console.log("🔄 Fase 2: Buscando agenda completa...");
                 const contacts = await client.getContacts();
-                console.log(`📂 Chats: ${chats.length} | 👥 Agenda: ${contacts.length}`);
-
-                const cacheFotos = {};
-                const syncChats = chats.slice(0, 100);
-                for (const chat of syncChats) {
-                    const peerId = chat.id._serialized;
-                    if (peerId.includes('@g.us')) continue;
-                    client.subscribePresence(peerId).catch(() => { });
-                    if (!cacheFotos[peerId]) {
-                        cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
-                    }
-                    const messages = await chat.fetchMessages({ limit: 3 });
-                    for (const msg of messages) {
-                        await processarMensagemSync(msg, cacheFotos[peerId]);
-                    }
-                }
-
                 const simplifiedContacts = contacts
                     .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
                     .map(c => ({
@@ -159,10 +164,9 @@ function initWhatsApp() {
                         foto: null
                     }));
 
-                console.log(`✅ SYNC FINALIZADO: ${mensagensRecebidas.length} msgs | ${simplifiedContacts.length} contatos.`);
-                io.emit('init_messages', mensagensRecebidas);
+                console.log(`✅ Fase 2 concluída: ${simplifiedContacts.length} contatos da agenda.`);
                 io.emit('init_contacts', simplifiedContacts);
-            } catch (err) { console.error("Erro no sync atrasado:", err); }
+            } catch (err) { console.error("Erro na Fase 2:", err); }
         }, 10000);
     });
 

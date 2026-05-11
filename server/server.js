@@ -188,7 +188,8 @@ app.use((req, res, next) => {
     next();
 });
 
-server.listen(3001, () => {
-    console.log('🚀 Server ON 3001');
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+    console.log(`🚀 Server ON ${PORT}`);
     initWhatsApp();
 });

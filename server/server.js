@@ -139,6 +139,9 @@ function initWhatsApp() {
                 const peerId = chat.id._serialized;
                 if (peerId.includes('@g.us')) continue;
 
+                // Forçar o recebimento de presença para todos os chats principais
+                client.subscribePresence(peerId).catch(() => { });
+
                 // Pré-carregar foto uma vez por chat
                 if (!cacheFotos[peerId]) {
                     cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
@@ -152,11 +155,6 @@ function initWhatsApp() {
 
             console.log(`✅ Sincronização concluída: ${mensagensRecebidas.length} mensagens carregadas.`);
             io.emit('init_messages', mensagensRecebidas);
-
-            // Subscrever presença de todos os chats sincronizados
-            for (const chat of syncChats) {
-                client.subscribePresence(chat.id._serialized).catch(() => { });
-            }
         } catch (err) {
             console.error("❌ Erro crítico na sincronização:", err);
             io.emit('init_messages', mensagensRecebidas);
@@ -192,10 +190,13 @@ function initWhatsApp() {
 
     client.on('presence_update', async (presence) => {
         const id_raw = presence.id._serialized;
-        const isOnline = presence.type === 'online';
+        const type = presence.type; // 'online', 'offline', 'typing', 'recording'
+        const isOnline = type === 'online';
+
+        console.log(`[Presence] Atualização capturada para ${id_raw}: ${type}`);
 
         let lastSeenFormatted = null;
-        if (!isOnline) {
+        if (type === 'offline') {
             const contact = await client.getContactById(id_raw).catch(() => null);
             const contactPresence = await contact?.getPresence().catch(() => null);
             if (contactPresence?.lastSeen) {

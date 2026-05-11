@@ -34,7 +34,8 @@ const WhatsAppConnect = () => {
                 console.error("Erro ao conectar API:", err);
             }
         };
-        const interval = setInterval(checkStatus, 10000);
+        checkStatus();
+        const interval = setInterval(checkStatus, 3000);
 
         return () => {
             socket.disconnect();

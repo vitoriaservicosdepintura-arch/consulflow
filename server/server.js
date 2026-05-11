@@ -100,7 +100,10 @@ function initWhatsApp() {
         io.emit('nova_mensagem', novaMsg);
     });
 
-    client.initialize().catch(() => io.emit('status_update', { status: 'erro' }));
+    client.initialize().catch((err) => {
+        console.error('ERRO Puppeteer:', err.message);
+        io.emit('status_update', { status: 'erro', mensagem: err.message });
+    });
 }
 
 io.on('connection', async (socket) => {
@@ -161,7 +164,7 @@ app.post('/api/desconectar', async (req, res) => {
         // Pequena pausa para garantir liberação de memória
         setTimeout(() => {
             initWhatsApp();
-        }, 5000);
+        }, 2000);
     } catch (e) { res.status(500).send(); }
 });
 

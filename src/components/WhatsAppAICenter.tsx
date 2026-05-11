@@ -122,7 +122,7 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
 };
 
 const WhatsAppAICenter = () => {
-    const [isConnected, setIsConnected] = useState(true);
+    const [isConnected, setIsConnected] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
     const [qrStatus, setQrStatus] = useState<'loading' | 'ready' | 'connecting' | 'success'>('loading');
     const [realMessages, setRealMessages] = useState<any[]>([]);

@@ -158,17 +158,17 @@ function initWhatsApp() {
                 }
             }
 
-            // Filtrar e simplificar contatos da agenda
+            // Filtrar contatos (ignorar grupos e IDs inválidos)
             const simplifiedContacts = contacts
-                .filter(c => !c.id._serialized.includes('@g.us') && c.isMyContact)
+                .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
                 .map(c => ({
                     id: c.id._serialized,
-                    name: c.name || c.pushname || c.number,
-                    number: c.number,
+                    name: c.name || c.pushname || c.number || "Sem Nome",
+                    number: c.number || (c.id ? c.id.user : ""),
                     foto: null
                 }));
 
-            console.log(`✅ Sincronização concluída: ${mensagensRecebidas.length} mensagens e ${simplifiedContacts.length} contatos da agenda.`);
+            console.log(`✅ Sync concluído: ${mensagensRecebidas.length} msgs e ${simplifiedContacts.length} contatos enviados.`);
 
             io.emit('init_messages', mensagensRecebidas);
             io.emit('init_contacts', simplifiedContacts);

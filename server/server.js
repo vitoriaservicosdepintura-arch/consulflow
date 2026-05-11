@@ -44,7 +44,7 @@ function initWhatsApp() {
         authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
         puppeteer: {
             headless: true,
-            executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser',
+            executablePath: process.env.CHROMIUM_PATH || '/run/current-system/sw/bin/chromium',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',

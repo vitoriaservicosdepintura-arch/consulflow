@@ -206,6 +206,23 @@ function initWhatsApp() {
         }
     }
 
+    app.get('/api/contatos', async (req, res) => {
+        try {
+            const contacts = await client.getContacts();
+            const simplified = contacts
+                .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                .map(c => ({
+                    id: c.id._serialized,
+                    name: c.name || c.pushname || c.number || "Sem Nome",
+                    number: c.number || (c.id ? c.id.user : ""),
+                    foto: null
+                }));
+            res.json(simplified);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     client.on('presence_update', async (presence) => {
         const id_raw = presence.id._serialized;
         const type = presence.type; // 'online', 'offline', 'typing', 'recording'

@@ -257,6 +257,8 @@ const WhatsAppAICenter = () => {
                 if (resMsgs.ok) setRealMessages(await resMsgs.json());
                 const resIA = await fetch(`${apiUrl}/api/ia/status`);
                 if (resIA.ok) setIaStatus(await resIA.json());
+                const resContacts = await fetch(`${apiUrl}/api/contatos`);
+                if (resContacts.ok) setAllContacts(await resContacts.json());
             } catch { }
         };
         init();
@@ -392,8 +394,12 @@ const WhatsAppAICenter = () => {
                 <div className="lg:col-span-2 bg-card rounded-[2rem] border border-border shadow-sm overflow-hidden flex flex-col h-[700px]">
                     {!isConnected ? (
                         <div className="flex-1 flex flex-col items-center justify-center opacity-50"><Loader2 className="w-12 h-12 animate-spin mb-4" /><p className="font-bold">Aguardando Conexão...</p></div>
-                    ) : realMessages.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center opacity-40"><Ghost className="w-12 h-12 mb-4" /><p>Nenhuma mensagem capturada.</p></div>
+                    ) : groupedContacts.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                            <Ghost className="w-12 h-12 mb-4" />
+                            <p className="font-medium">Carregando contatos da agenda...</p>
+                            <p className="text-xs opacity-60">Isso pode levar alguns segundos após conectar.</p>
+                        </div>
                     ) : (
                         <div className="flex flex-1 overflow-hidden">
                             {/* Contact List */}

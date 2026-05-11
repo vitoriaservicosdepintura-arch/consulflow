@@ -126,7 +126,7 @@ const WhatsAppAICenter = () => {
     const [showQRModal, setShowQRModal] = useState(false);
     const [qrStatus, setQrStatus] = useState<'loading' | 'ready' | 'connecting' | 'success'>('loading');
     const [realMessages, setRealMessages] = useState<any[]>([]);
-    const [apiUrl, setApiUrl] = useState("http://localhost:3001");
+    const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || 'http://localhost:3001');
     const [isApiSyncing, setIsApiSyncing] = useState(false);
     const [backendQr, setBackendQr] = useState<string | null>(null);
     const [activeContact, setActiveContact] = useState<any | null>(null);

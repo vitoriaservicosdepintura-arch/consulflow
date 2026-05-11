@@ -5,7 +5,7 @@ import { Zap, MessageCircle, RefreshCw } from "lucide-react";
 const WhatsAppConnect = () => {
     const [status, setStatus] = useState('iniciando');
     const [qrCode, setQrCode] = useState('');
-    const [apiUrl, setApiUrl] = useState('http://localhost:3001');
+    const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
     useEffect(() => {
         const socket = io(apiUrl);

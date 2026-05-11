@@ -1,127 +1,137 @@
-import React, { useState, useEffect } from 'react';
-import { io } from "socket.io-client";
-import { Zap, MessageCircle, RefreshCw } from "lucide-react";
+import React, { useState, useEffect, useCallback } from 'react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const WhatsAppConnect = () => {
-    const [status, setStatus] = useState('iniciando');
+    const [status, setStatus] = useState<'iniciando' | 'aguardando_qr' | 'conectado' | 'erro'>('iniciando');
     const [qrCode, setQrCode] = useState('');
-    const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || 'http://localhost:3001');
+    const [tentativas, setTentativas] = useState(0);
+
+    const fetchStatus = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/status`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                // Sem cache — sempre busca dado novo
+                cache: 'no-store',
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            console.log('[WhatsApp] Status:', data.status);
+
+            if (data.status === 'conectado') {
+                setStatus('conectado');
+                setQrCode('');
+            } else if (data.status === 'aguardando_qr' && data.qr_code_imagem) {
+                setStatus('aguardando_qr');
+                setQrCode(data.qr_code_imagem);
+            } else {
+                setStatus('iniciando');
+            }
+
+            setTentativas(0); // resetar contador de erros
+        } catch (error) {
+            console.error('[WhatsApp] Erro ao buscar status:', error);
+            setTentativas(prev => prev + 1);
+            if (tentativas >= 5) {
+                setStatus('erro');
+            }
+        }
+    }, [tentativas]);
 
     useEffect(() => {
-        const socket = io(apiUrl, {
-            transports: ['polling'],
-            reconnectionAttempts: 10,
-            reconnectionDelay: 2000
-        });
+        fetchStatus(); // busca imediata
+        const interval = setInterval(fetchStatus, 3000); // polling a cada 3s
+        return () => clearInterval(interval);
+    }, [fetchStatus]);
 
-        socket.on('connect', () => {
-            console.log('✅ Socket conectado no Connect UI');
-        });
-
-        socket.on('status_update', (data) => {
-            setStatus(data.status);
-            if (data.qr_code_imagem) {
-                setQrCode(data.qr_code_imagem);
-            }
-        });
-
-        // Fallback polling (10s)
-        const checkStatus = async () => {
-            try {
-                const res = await fetch(`${apiUrl}/api/status`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setStatus(data.status);
-                    if (data.qr_code_imagem) setQrCode(data.qr_code_imagem);
-                }
-            } catch (err) {
-                console.error("Erro ao conectar API:", err);
-            }
-        };
-        checkStatus();
-        const interval = setInterval(checkStatus, 3000);
-
-        return () => {
-            socket.disconnect();
-            clearInterval(interval);
-        };
-    }, [apiUrl]);
+    const handleDesconectar = async () => {
+        try {
+            await fetch(`${API_URL}/api/desconectar`, { method: 'POST' });
+            setStatus('iniciando');
+            setQrCode('');
+        } catch (e) {
+            console.error('Erro ao desconectar:', e);
+        }
+    };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 bg-card rounded-[2rem] border border-border shadow-2xl text-center max-w-sm mx-auto">
-            <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-                <Zap className={`w-8 h-8 ${status === 'conectado' ? 'text-emerald-500' : 'text-amber-500 animate-pulse'}`} />
-            </div>
+        <div className="flex flex-col items-center justify-center p-6 bg-card rounded-3xl border border-border shadow-sm text-center min-h-[280px]">
+            <h2 className="text-xl font-bold mb-4">Conexão WhatsApp</h2>
 
-            <h2 className="text-2xl font-black mb-2 text-slate-800">Conexão WhatsApp</h2>
-            <p className="text-xs text-slate-400 mb-8 px-4">Sincronize o seu atendimento com a Inteligência Artificial da SVG Multimídia.</p>
-
+            {/* INICIANDO */}
             {status === 'iniciando' && (
-                <div className="space-y-6 py-4">
-                    <div className="relative">
-                        <div className="w-20 h-20 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <RefreshCw className="w-6 h-6 text-emerald-500 animate-reverse-spin" />
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-slate-600 font-bold animate-pulse">Iniciando o WhatsApp...</p>
-                        <p className="text-[10px] text-slate-400 mt-2">Isto pode demorar até 30 segundos dependendo da sua conexão.</p>
-                    </div>
+                <div className="space-y-4">
+                    <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-muted-foreground animate-pulse">Iniciando o WhatsApp, aguarde...</p>
+                    <p className="text-xs text-muted-foreground">Conectando ao servidor local...</p>
                 </div>
             )}
 
-            {status === 'aguardando_qr' && (
-                <div className="space-y-6 animate-in fade-in zoom-in-95 duration-700">
-                    <div className="p-4 bg-white rounded-3xl shadow-2xl inline-block border-4 border-emerald-500/10 relative group">
-                        {qrCode ? (
-                            <img src={qrCode} alt="QR Code" className="w-[180px] h-[180px] rounded-xl" />
-                        ) : (
-                            <div className="w-[180px] h-[180px] bg-slate-50 flex items-center justify-center rounded-xl">
-                                <Loader2 className="w-8 h-8 animate-spin text-slate-200" />
-                            </div>
-                        )}
-                        <div className="absolute -top-3 -right-3 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-card">
-                            <Scan className="w-4 h-4" />
-                        </div>
+            {/* QR CODE */}
+            {status === 'aguardando_qr' && qrCode && (
+                <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+                    <div className="p-3 bg-white rounded-2xl shadow-lg inline-block border border-border">
+                        <img
+                            src={qrCode}
+                            alt="QR Code WhatsApp"
+                            className="w-[220px] h-[220px]"
+                            onError={(e) => console.error('Erro ao carregar QR:', e)}
+                        />
                     </div>
-                    <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                        <p className="text-emerald-700 text-xs font-bold flex items-center justify-center gap-2">
-                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                            Escaneie para conectar a IA
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {status === 'conectado' && (
-                <div className="animate-in slide-in-from-top-4 duration-700">
-                    <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-emerald-500/20 shadow-lg">
-                        <span className="text-emerald-500 text-4xl">✅</span>
-                    </div>
-                    <p className="text-emerald-600 font-black text-xl mb-2">IA Sincronizada!</p>
-                    <p className="text-xs text-slate-500 mb-8 italic">O seu CRM já está capturando mensagens em tempo real.</p>
-
+                    <p className="text-orange-500 font-bold flex items-center justify-center gap-2 text-sm">
+                        <span className="w-2 h-2 bg-orange-500 rounded-full animate-ping inline-block" />
+                        Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo
+                    </p>
                     <button
-                        onClick={async () => {
-                            const res = await fetch(`${apiUrl}/api/desconectar`, { method: 'POST' });
-                            if (res.ok) window.location.reload();
-                        }}
-                        className="w-full py-4 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
+                        onClick={fetchStatus}
+                        className="text-xs text-muted-foreground underline"
                     >
-                        Desconectar da IA
+                        Atualizar QR Code
+                    </button>
+                </div>
+            )}
+
+            {/* CONECTADO */}
+            {status === 'conectado' && (
+                <div className="animate-in slide-in-from-top-4 duration-500 space-y-3">
+                    <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-emerald-500 text-3xl">✅</span>
+                    </div>
+                    <p className="text-emerald-600 font-bold text-lg">WhatsApp Conectado!</p>
+                    <p className="text-xs text-muted-foreground italic">Monitorando mensagens em tempo real...</p>
+                    <button
+                        onClick={handleDesconectar}
+                        className="mt-4 px-4 py-2 border border-border rounded-xl text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-all"
+                    >
+                        Desconectar / Novo QR
+                    </button>
+                </div>
+            )}
+
+            {/* ERRO DE CONEXÃO */}
+            {status === 'erro' && (
+                <div className="space-y-3">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-red-500 text-3xl">❌</span>
+                    </div>
+                    <p className="text-red-500 font-bold">Servidor não encontrado</p>
+                    <p className="text-xs text-muted-foreground">
+                        Certifique-se que o servidor está rodando:<br />
+                        <code className="bg-muted px-1 rounded text-xs">node server.js</code> na pasta <code className="bg-muted px-1 rounded text-xs">/server</code>
+                    </p>
+                    <button
+                        onClick={() => { setStatus('iniciando'); setTentativas(0); fetchStatus(); }}
+                        className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all"
+                    >
+                        Tentar novamente
                     </button>
                 </div>
             )}
         </div>
     );
 };
-
-const Loader2 = ({ className }: { className?: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-);
-const Scan = ({ className }: { className?: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><line x1="7" x2="17" y1="12" y2="12" /></svg>
-);
 
 export default WhatsAppConnect;

@@ -152,6 +152,11 @@ function initWhatsApp() {
 
             console.log(`✅ Sincronização concluída: ${mensagensRecebidas.length} mensagens carregadas.`);
             io.emit('init_messages', mensagensRecebidas);
+
+            // Subscrever presença de todos os chats sincronizados
+            for (const chat of syncChats) {
+                client.subscribePresence(chat.id._serialized).catch(() => { });
+            }
         } catch (err) {
             console.error("❌ Erro crítico na sincronização:", err);
             io.emit('init_messages', mensagensRecebidas);
@@ -184,6 +189,27 @@ function initWhatsApp() {
             mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
         }
     }
+
+    client.on('presence_update', async (presence) => {
+        const id_raw = presence.id._serialized;
+        const isOnline = presence.type === 'online';
+
+        let lastSeenFormatted = null;
+        if (!isOnline) {
+            const contact = await client.getContactById(id_raw).catch(() => null);
+            const contactPresence = await contact?.getPresence().catch(() => null);
+            if (contactPresence?.lastSeen) {
+                const date = new Date(contactPresence.lastSeen * 1000);
+                lastSeenFormatted = `hoje às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+            }
+        }
+
+        io.emit('presenca_update', {
+            id_raw: id_raw,
+            isOnline: isOnline,
+            lastSeen: lastSeenFormatted
+        });
+    });
 
     client.on('auth_failure', () => {
         console.log('❌ Falha Auth');

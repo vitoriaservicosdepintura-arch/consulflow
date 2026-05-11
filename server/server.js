@@ -113,10 +113,12 @@ function initWhatsApp() {
         io.emit('nova_mensagem', novaMsg);
     });
 
-    client.initialize().catch((err) => {
-        console.error('ERRO Puppeteer:', err.message);
-        io.emit('status_update', { status: 'erro', mensagem: err.message });
-    });
+    setTimeout(() => {
+        client.initialize().catch((err) => {
+            console.error('ERRO Puppeteer:', err.message);
+            io.emit('status_update', { status: 'erro', mensagem: err.message });
+        });
+    }, 5000);
 }
 
 io.on('connection', async (socket) => {

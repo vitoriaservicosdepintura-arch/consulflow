@@ -136,27 +136,56 @@ const WhatsAppAICenter = () => {
     const [iaStatus, setIaStatus] = useState<Record<string, boolean>>({});
     const [isIASuggesting, setIsIASuggesting] = useState(false);
     const [presencas, setPresencas] = useState<Record<string, { isOnline: boolean, lastSeen: string | null }>>({});
+    const [allContacts, setAllContacts] = useState<any[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
 
-    // Agrupar mensagens por contato
-    const groupedContacts = Object.values(realMessages.reduce((acc: any, msg: any) => {
-        const key = msg.de_raw || msg.de;
-        if (key === 'me') return acc;
-        if (!acc[key]) {
-            acc[key] = {
-                id: key,
-                number: msg.de || key.split('@')[0],
-                rawId: key,
-                name: msg.nome || key.split('@')[0],
-                photo: msg.foto,
-                messages: []
-            };
-        }
-        acc[key].messages.push(msg);
-        return acc;
-    }, {})) as any[];
+    // Agrupar mensagens por contato e mesclar com a agenda completa
+    const groupedContacts = (() => {
+        const acc = realMessages.reduce((acc: any, msg: any) => {
+            const key = msg.de_raw || msg.de;
+            if (key === 'me') return acc;
+            if (!acc[key]) {
+                acc[key] = {
+                    id: key,
+                    number: msg.de || key.split('@')[0],
+                    rawId: key,
+                    name: msg.nome || key.split('@')[0],
+                    photo: msg.foto,
+                    messages: []
+                };
+            }
+            acc[key].messages.push(msg);
+            return acc;
+        }, {});
+
+        // Adicionar contatos da agenda que não estão nas mensagens
+        allContacts.forEach(c => {
+            if (!acc[c.id]) {
+                acc[c.id] = {
+                    id: c.id,
+                    number: c.number,
+                    rawId: c.id,
+                    name: c.name,
+                    photo: c.foto,
+                    messages: []
+                };
+            }
+        });
+
+        return Object.values(acc).sort((a: any, b: any) => {
+            // Priorizar quem tem mensagens
+            if (a.messages.length > 0 && b.messages.length === 0) return -1;
+            if (a.messages.length === 0 && b.messages.length > 0) return 1;
+            // Depois por data da última mensagem
+            if (a.messages.length > 0 && b.messages.length > 0) {
+                return b.messages[0].timestamp - a.messages[0].timestamp;
+            }
+            // Por fim por nome
+            return a.name.localeCompare(b.name);
+        }) as any[];
+    })();
 
     // Sincroniza o contato ativo caso novas mensagens cheguem
     useEffect(() => {
@@ -181,6 +210,7 @@ const WhatsAppAICenter = () => {
             });
         });
         socket.on("init_messages", (msgs) => setRealMessages(msgs));
+        socket.on("init_contacts", (contacts) => setAllContacts(contacts));
         socket.on("ia_sugestao", (data) => {
             if (activeContact && data.id_raw === activeContact.rawId) {
                 setInputMessage(data.sugestao);

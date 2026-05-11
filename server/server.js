@@ -128,21 +128,26 @@ function initWhatsApp() {
         io.emit('status_update', { status: 'conectado' });
 
         try {
-            console.log("🔄 Iniciando sincronização total de contatos e mensagens...");
+            console.log("🔄 Iniciando sincronização massiva de contatos e mensagens...");
+
+            // 1. Buscar todos os CHATS (conversas ativas)
             const chats = await client.getChats();
             console.log(`📂 Total de chats encontrados: ${chats.length}`);
 
-            const syncChats = chats.slice(0, 30);
-            const cacheFotos = {}; // Cache temporário para o sync atual
+            // 2. Buscar todos os CONTATOS (agenda completa)
+            const contacts = await client.getContacts();
+            console.log(`👥 Total de contatos na agenda: ${contacts.length}`);
 
+            const cacheFotos = {};
+
+            // Sincronizar mensagens dos chats mais recentes (Top 50 para não pesar demais o boot)
+            const syncChats = chats.slice(0, 50);
             for (const chat of syncChats) {
                 const peerId = chat.id._serialized;
                 if (peerId.includes('@g.us')) continue;
 
-                // Forçar o recebimento de presença para todos os chats principais
                 client.subscribePresence(peerId).catch(() => { });
 
-                // Pré-carregar foto uma vez por chat
                 if (!cacheFotos[peerId]) {
                     cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
                 }
@@ -153,8 +158,21 @@ function initWhatsApp() {
                 }
             }
 
-            console.log(`✅ Sincronização concluída: ${mensagensRecebidas.length} mensagens carregadas.`);
+            // Filtrar e simplificar contatos da agenda
+            const simplifiedContacts = contacts
+                .filter(c => !c.id._serialized.includes('@g.us') && c.isMyContact)
+                .map(c => ({
+                    id: c.id._serialized,
+                    name: c.name || c.pushname || c.number,
+                    number: c.number,
+                    foto: null
+                }));
+
+            console.log(`✅ Sincronização concluída: ${mensagensRecebidas.length} mensagens e ${simplifiedContacts.length} contatos da agenda.`);
+
             io.emit('init_messages', mensagensRecebidas);
+            io.emit('init_contacts', simplifiedContacts);
+
         } catch (err) {
             console.error("❌ Erro crítico na sincronização:", err);
             io.emit('init_messages', mensagensRecebidas);

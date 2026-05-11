@@ -52,7 +52,7 @@ function initWhatsApp() {
         },
         puppeteer: {
             headless: true,
-            executablePath: process.env.CHROMIUM_PATH || '/usr/bin/google-chrome-stable',
+            executablePath: process.env.CHROMIUM_PATH || undefined, // Removido fixo de linux para funcionar no windows automaticamente
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -65,6 +65,55 @@ function initWhatsApp() {
         }
     });
 
+    async function processarMensagem(msg, emitir = true) {
+        try {
+            const peerId = msg.fromMe ? msg.to : msg.from;
+            if (!peerId || peerId.includes('@g.us')) return;
+
+            // Cache básico para não repetir chamadas de contato/foto na mesma execução
+            const contato = await client.getContactById(peerId).catch(() => null);
+            const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
+
+            let fotoUrl = null;
+            try {
+                fotoUrl = await client.getProfilePicUrl(peerId);
+            } catch (e) { }
+
+            let mediaData = null;
+            if (msg.hasMedia && emitir) {
+                try {
+                    const media = await msg.downloadMedia();
+                    if (media) mediaData = { mimetype: media.mimetype, data: media.data, filename: media.filename };
+                } catch (e) { }
+            }
+
+            const novaMsg = {
+                id: msg.id.id,
+                de_raw: peerId,
+                fromMe: msg.fromMe,
+                nome: nome,
+                foto: fotoUrl, // Incluir foto diretamente
+                texto: msg.body,
+                horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: msg.timestamp,
+                type: msg.type,
+                hasMedia: msg.hasMedia,
+                media: mediaData
+            };
+
+            const index = mensagensRecebidas.findIndex(m => m.id === novaMsg.id);
+            if (index === -1) {
+                mensagensRecebidas.push(novaMsg);
+                mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
+                if (mensagensRecebidas.length > 500) mensagensRecebidas.pop();
+
+                if (emitir) io.emit('nova_mensagem', novaMsg);
+            }
+        } catch (err) {
+            console.error("Erro ao processar mensagem:", err.message);
+        }
+    }
+
     client.on('qr', async (qr) => {
         console.log("📲 QR Gerado");
         qrCodeData = qr;
@@ -72,11 +121,69 @@ function initWhatsApp() {
         io.emit('status_update', { status: 'aguardando_qr', qr_code_imagem: qrImage });
     });
 
-    client.on('ready', () => {
-        console.log('✅ Pronto');
-        isConnected = true; qrCodeData = '';
+    client.on('ready', async () => {
+        console.log('✅ WhatsApp Pronto e Conectado!');
+        isConnected = true;
+        qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
+
+        try {
+            console.log("🔄 Iniciando sincronização total de contatos e mensagens...");
+            const chats = await client.getChats();
+            console.log(`📂 Total de chats encontrados: ${chats.length}`);
+
+            const syncChats = chats.slice(0, 30);
+            const cacheFotos = {}; // Cache temporário para o sync atual
+
+            for (const chat of syncChats) {
+                const peerId = chat.id._serialized;
+                if (peerId.includes('@g.us')) continue;
+
+                // Pré-carregar foto uma vez por chat
+                if (!cacheFotos[peerId]) {
+                    cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
+                }
+
+                const messages = await chat.fetchMessages({ limit: 3 });
+                for (const msg of messages) {
+                    await processarMensagemSync(msg, cacheFotos[peerId]);
+                }
+            }
+
+            console.log(`✅ Sincronização concluída: ${mensagensRecebidas.length} mensagens carregadas.`);
+            io.emit('init_messages', mensagensRecebidas);
+        } catch (err) {
+            console.error("❌ Erro crítico na sincronização:", err);
+            io.emit('init_messages', mensagensRecebidas);
+        }
     });
+
+    async function processarMensagemSync(msg, fotoUrl) {
+        const peerId = msg.fromMe ? msg.to : msg.from;
+        if (!peerId || peerId.includes('@g.us')) return;
+
+        const contato = await client.getContactById(peerId).catch(() => null);
+        const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
+
+        const novaMsg = {
+            id: msg.id.id,
+            de_raw: peerId,
+            fromMe: msg.fromMe,
+            nome: nome,
+            foto: fotoUrl,
+            texto: msg.body,
+            horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            timestamp: msg.timestamp,
+            type: msg.type,
+            hasMedia: msg.hasMedia,
+            media: null // Por performance, não baixar mídia no sync inicial
+        };
+
+        if (!mensagensRecebidas.some(m => m.id === novaMsg.id)) {
+            mensagensRecebidas.push(novaMsg);
+            mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
+        }
+    }
 
     client.on('auth_failure', () => {
         console.log('❌ Falha Auth');
@@ -85,36 +192,7 @@ function initWhatsApp() {
     });
 
     client.on('message_create', async (msg) => {
-        const peerId = msg.fromMe ? msg.to : msg.from;
-        if (peerId.includes('@g.us')) return;
-
-        const contato = await client.getContactById(peerId).catch(() => null);
-        const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
-
-        let mediaData = null;
-        if (msg.hasMedia) {
-            try {
-                const media = await msg.downloadMedia();
-                if (media) mediaData = { mimetype: media.mimetype, data: media.data, filename: media.filename };
-            } catch (e) { }
-        }
-
-        const novaMsg = {
-            id: msg.id.id,
-            de_raw: peerId,
-            fromMe: msg.fromMe,
-            nome: nome,
-            texto: msg.body,
-            horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            timestamp: Date.now() / 1000,
-            type: msg.type,
-            hasMedia: msg.hasMedia,
-            media: mediaData
-        };
-
-        mensagensRecebidas.unshift(novaMsg);
-        if (mensagensRecebidas.length > 100) mensagensRecebidas.pop();
-        io.emit('nova_mensagem', novaMsg);
+        await processarMensagem(msg, true);
     });
 
     setTimeout(() => {
@@ -196,6 +274,6 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`🚀 Server ON ${PORT}`);
+    console.log(`🚀 Server Multimedia na ${PORT}`); // Ajustado para bater com os logs do usuário
     initWhatsApp();
 });

@@ -150,6 +150,7 @@ const WhatsAppAICenter = () => {
                 number: msg.de || key.split('@')[0],
                 rawId: key,
                 name: msg.nome || key.split('@')[0],
+                photo: msg.foto,
                 messages: []
             };
         }
@@ -373,7 +374,9 @@ const WhatsAppAICenter = () => {
                                         {groupedContacts.map((c: any) => (
                                             <div key={c.id} onClick={() => setActiveContact(c)} className={`p-4 cursor-pointer border-b transition-all flex gap-3 hover:bg-emerald-50 ${activeContact?.id === c.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}>
                                                 <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-700 relative overflow-hidden shrink-0">
-                                                    {profilePics[c.id] && profilePics[c.id] !== 'none' ? (
+                                                    {c.photo ? (
+                                                        <img src={c.photo} alt="PI" className="w-full h-full object-cover" />
+                                                    ) : profilePics[c.id] && profilePics[c.id] !== 'none' ? (
                                                         <img src={profilePics[c.id]} alt="PI" className="w-full h-full object-cover" />
                                                     ) : (
                                                         c.name.charAt(0).toUpperCase()

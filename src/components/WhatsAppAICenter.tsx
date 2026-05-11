@@ -167,7 +167,11 @@ const WhatsAppAICenter = () => {
 
     // Socket Connection
     useEffect(() => {
-        const socket = io(apiUrl);
+        const socket = io(apiUrl, {
+            transports: ['polling'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000
+        });
         socket.on("connect", () => console.log("✅ Socket Conectado"));
         socket.on("nova_mensagem", (msg) => {
             setRealMessages(prev => {

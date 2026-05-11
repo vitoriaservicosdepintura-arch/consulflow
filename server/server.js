@@ -12,7 +12,11 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "*" },
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    },
+    transports: ['polling', 'websocket'],
     maxHttpBufferSize: 1e8
 });
 
@@ -175,6 +179,13 @@ app.post('/api/desconectar', async (req, res) => {
             initWhatsApp();
         }, 2000);
     } catch (e) { res.status(500).send(); }
+});
+app.options('*', cors());
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
 });
 
 server.listen(3001, () => {

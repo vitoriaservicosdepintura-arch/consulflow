@@ -8,7 +8,11 @@ const WhatsAppConnect = () => {
     const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
     useEffect(() => {
-        const socket = io(apiUrl);
+        const socket = io(apiUrl, {
+            transports: ['polling'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000
+        });
 
         socket.on('connect', () => {
             console.log('✅ Socket conectado no Connect UI');

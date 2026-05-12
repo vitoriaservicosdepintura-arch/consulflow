@@ -180,16 +180,6 @@ const WhatsAppAICenter = () => {
             .filter((c: any) => {
                 const q = contactSearch.toLowerCase();
                 return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
-            })
-            .sort((a: any, b: any) => {
-                const lastA = Math.max(a.lastMessageTimestamp || 0, a.messages[0]?.timestamp || 0);
-                const lastB = Math.max(b.lastMessageTimestamp || 0, b.messages[0]?.timestamp || 0);
-
-                if (lastA !== lastB) {
-                    return lastB - lastA;
-                }
-
-                return a.name.localeCompare(b.name);
             }) as any[];
     })();
 

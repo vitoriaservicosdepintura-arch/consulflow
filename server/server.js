@@ -123,83 +123,62 @@ function initWhatsApp() {
     });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp PRONTO - Iniciando Carga de Elite');
+        console.log('✅ WhatsApp CONECTADO - Mantendo Ordem do Celular');
         isConnected = true;
         qrCodeData = '';
 
         try {
-            // 1. Busca os chats (A ordem aqui já é a do celular)
             const chats = await client.getChats();
-            console.log(`📂 Processando ${chats.length} conversas...`);
 
-            // 2. CARGA DE ELITE: Pega os 20 primeiros com DETALHES TOTAIS (Foto + Última Msg)
-            // Fazemos isso em um bloco rápido antes do primeiro aviso
-            const eliteChats = await Promise.all(chats.slice(0, 20).map(async (chat) => {
-                const peerId = chat.id._serialized;
-                if (!peerId || peerId.includes('@g.us')) return null;
+            // 1. MAPEAMENTO INICIAL (Mantendo a ordem fiel do array 'chats')
+            contatosSalvos = chats
+                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                .map(c => ({
+                    id: c.id._serialized,
+                    name: c.name || "Sem Nome",
+                    number: c.id.user,
+                    foto: null,
+                    lastMessageTimestamp: c.timestamp * 1000, // Converte para ms
+                    lastMessageText: "",
+                    lastMessageFromMe: false,
+                    lastMessageTime: new Date(c.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                }));
 
-                try {
-                    const foto = await client.getProfilePicUrl(peerId).catch(() => null);
-                    const lastMsgs = await chat.fetchMessages({ limit: 1 }).catch(() => []);
-                    const lastMsg = lastMsgs[0];
-
-                    if (lastMsg) {
-                        await processarMensagemSync(lastMsg, foto);
-                    }
-
-                    return {
-                        id: peerId,
-                        name: chat.name || "Sem Nome",
-                        number: peerId.split('@')[0],
-                        foto: foto,
-                        lastMessageTimestamp: chat.timestamp || 0,
-                        lastMessageText: lastMsg ? lastMsg.body : "",
-                        lastMessageFromMe: lastMsg ? lastMsg.fromMe : false,
-                        lastMessageTime: lastMsg ? new Date(lastMsg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ""
-                    };
-                } catch (e) {
-                    return { id: peerId, name: chat.name || "Sem Nome", number: peerId.split('@')[0], foto: null, lastMessageTimestamp: chat.timestamp || 0 };
-                }
-            }));
-
-            contatosSalvos = eliteChats.filter(c => c !== null);
-
-            // LIBERA A TELA - Agora com os 20 primeiros COMPLETOS (fotos e msgs)
+            // Avisa o front IMEDIATAMENTE com a ordem do celular
             io.emit('status_update', { status: 'conectado' });
             io.emit('init_contacts', contatosSalvos);
-            io.emit('init_messages', mensagensRecebidas);
 
-            // 3. CARGA COMPLEMENTAR: Faz o resto da lista em background
+            // 2. CARGA DE DETALHES (Background, mas sem mudar a ordem)
             (async () => {
-                const remaining = chats.slice(20, 100);
-                for (const c of remaining) {
-                    const peerId = c.id._serialized;
-                    if (!peerId || peerId.includes('@g.us')) continue;
-
+                for (let i = 0; i < Math.min(contatosSalvos.length, 50); i++) {
+                    const c = contatosSalvos[i];
                     try {
-                        const foto = await client.getProfilePicUrl(peerId).catch(() => null);
-                        const lastMsgs = await c.fetchMessages({ limit: 1 }).catch(() => []);
+                        const chatObj = await client.getChatById(c.id);
+                        const foto = await client.getProfilePicUrl(c.id).catch(() => null);
+                        const lastMsgs = await chatObj.fetchMessages({ limit: 10 }).catch(() => []);
 
-                        contatosSalvos.push({
-                            id: peerId,
-                            name: c.name || "Sem Nome",
-                            number: peerId.split('@')[0],
-                            foto: foto,
-                            lastMessageTimestamp: c.timestamp || 0,
-                            lastMessageText: lastMsgs.length > 0 ? lastMsgs[0].body : "",
-                            lastMessageFromMe: lastMsgs.length > 0 ? lastMsgs[0].fromMe : false
-                        });
-
-                        // Atualiza a cada 10 para não sobrecarregar
-                        if (contatosSalvos.length % 10 === 0) {
-                            io.emit('init_contacts', contatosSalvos);
+                        contatosSalvos[i].foto = foto;
+                        if (lastMsgs.length > 0) {
+                            const last = lastMsgs[lastMsgs.length - 1];
+                            contatosSalvos[i].lastMessageText = last.body;
+                            contatosSalvos[i].lastMessageFromMe = last.fromMe;
+                            contatosSalvos[i].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            contatosSalvos[i].lastMessageTimestamp = last.timestamp * 1000;
                         }
+
+                        for (const m of lastMsgs) {
+                            await processarMensagemSync(m, foto);
+                        }
+
+                        // Emite a cada contato processado para atualizar as fotos
+                        io.emit('init_contacts', contatosSalvos);
+                        io.emit('init_messages', mensagensRecebidas);
                     } catch (e) { }
                 }
             })();
 
         } catch (err) {
-            console.error("Erro na carga de elite:", err);
+            console.error("Erro na carga:", err);
             io.emit('status_update', { status: 'conectado' });
         }
     });

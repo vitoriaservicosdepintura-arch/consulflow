@@ -56,22 +56,37 @@ const MarketingStudio = () => {
                     'X-Title': 'ConsuFlow AI Marketing Studio'
                 },
                 body: JSON.stringify({
-                    model: 'openai/dall-e-3',
+                    model: 'black-forest-labs/flux-schnell',
                     messages: [{ role: 'user', content: enhancedPrompt }],
-                    max_tokens: 1000
+                    modalities: ["image"]
                 })
             });
 
             const data = await response.json();
+
+            // OpenRouter image generation format
+            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.images) {
+                const imgData = data.choices[0].message.images[0];
+                const url = typeof imgData === 'string' ? imgData : imgData.image_url?.url || imgData.url;
+                if (url) {
+                    setGeneratedImageUrl(url);
+                    toast.success('Arte gerada com sucesso! ✨');
+                    return;
+                }
+            }
+
+            // Fallback for some providers that might return data.data[0].url
             if (data.data && data.data[0] && data.data[0].url) {
                 setGeneratedImageUrl(data.data[0].url);
                 toast.success('Arte gerada com sucesso! ✨');
-            } else {
-                throw new Error('No image');
+                return;
             }
+
+            throw new Error('Formato de resposta inesperado');
         } catch (e) {
-            toast.info('Arte gerada! (Demonstração visual)');
-            // Mock fallback
+            console.error("OpenRouter Image Error:", e);
+            toast.error('Erro ao gerar imagem. Verifique seu saldo na OpenRouter.');
+            // Mock fallback only for visual demonstration if fails
             setGeneratedImageUrl('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1080');
         } finally {
             setIsLoading(false);
@@ -91,7 +106,7 @@ const MarketingStudio = () => {
                     'X-Title': 'ConsuFlow AI Marketing Studio'
                 },
                 body: JSON.stringify({
-                    model: 'openai/gpt-4o-mini',
+                    model: 'google/gemini-2.0-flash-exp:free',
                     messages: [{
                         role: 'user',
                         content: `Gere 6 prompts criativos e profissionais para criar imagens de marketing premium para um consultor. Responda APENAS com JSON válido, sem markdown: {"prompts":["prompt1","prompt2","prompt3","prompt4","prompt5","prompt6"]}. Escreva em português do Brasil.`
@@ -105,6 +120,7 @@ const MarketingStudio = () => {
             const parsed = JSON.parse(text);
             setSuggestions(parsed.prompts);
         } catch (e) {
+            console.error("OpenRouter Error:", e);
             setSuggestions([
                 'Consultor de negócios em escritório executivo moderno, iluminação lateral suave dourada',
                 'Reunião de alto nível em sala de conferência minimalista, paleta escura e dourada',
@@ -115,6 +131,68 @@ const MarketingStudio = () => {
             ]);
         } finally {
             setLoadingSuggestions(false);
+        }
+    };
+
+    const handleGenerateCarousel = async () => {
+        if (!slideTitle.trim()) {
+            toast.error('Defina um tema para o carrossel!');
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${OPENROUTER_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'google/gemini-2.0-flash-exp:free',
+                    messages: [{
+                        role: 'user',
+                        content: `Crie um título impactante e 4 subtópicos para um carrossel de Instagram sobre: ${slideTitle}. Responda apenas com JSON: {"title": "titulo", "slides": ["topic1", "topic2", "topic3", "topic4"]}`
+                    }]
+                })
+            });
+            const data = await res.json();
+            const result = JSON.parse(data.choices[0].message.content.replace(/```json|```/g, ''));
+            setSlideTitle(result.title);
+            toast.success('Conteúdo do Carrossel gerado!');
+        } catch (e) {
+            toast.error('Erro ao gerar carrossel com IA');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleGenerateAds = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${OPENROUTER_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'google/gemini-2.0-flash-exp:free',
+                    messages: [{
+                        role: 'user',
+                        content: `Crie um anúncio de alta conversão para ${activePlatform}. Headline impactante e corpo persuasivo. Tema livre para consultoria. Responda apenas JSON: {"headline": "...", "body": "...", "cta": "..."}`
+                    }]
+                })
+            });
+            const data = await res.json();
+            const result = JSON.parse(data.choices[0].message.content.replace(/```json|```/g, ''));
+            setAdHeadline(result.headline);
+            setAdBody(result.body);
+            setAdCta(result.cta || 'Saiba Mais →');
+            toast.success('Anúncio criado pela IA!');
+        } catch (e) {
+            toast.error('Erro ao gerar anúncio');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -363,8 +441,11 @@ const MarketingStudio = () => {
                                         onChange={(e) => setSlideTitle(e.target.value)}
                                         className="w-full bg-[#1E1E1E] border border-white/5 rounded-xl p-3 text-xs text-white outline-none focus:border-[#C9A84C]/30 mb-4"
                                     />
-                                    <button className="w-full bg-[#C9A84C]/10 text-[#C9A84C] py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#C9A84C]/20 transition-all border border-[#C9A84C]/20">
-                                        Gerar Slide com IA
+                                    <button
+                                        onClick={handleGenerateCarousel}
+                                        disabled={isLoading}
+                                        className="w-full bg-primary/10 text-primary py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/20 transition-all border border-primary/20 disabled:opacity-50">
+                                        {isLoading ? 'GERANDO...' : 'Gerar Slide com IA'}
                                     </button>
                                 </div>
                             </div>
@@ -422,7 +503,12 @@ const MarketingStudio = () => {
                                             <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A7060]">Copy (Texto)</label>
                                             <textarea value={adBody} onChange={e => setAdBody(e.target.value)} className="w-full bg-[#1E1E1E] border border-white/5 rounded-xl p-3 text-xs text-white outline-none focus:border-[#C9A84C]/30 min-h-[80px] resize-none" />
                                         </div>
-                                        <button className="w-full bg-[#C9A84C] text-[#0D0D0D] py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:bg-[#F2D98A] transition-all">Gerar Anúncio com IA</button>
+                                        <button
+                                            onClick={handleGenerateAds}
+                                            disabled={isLoading}
+                                            className="w-full bg-primary text-primary-foreground py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50">
+                                            {isLoading ? 'CRIANDO...' : 'Gerar Anúncio com IA'}
+                                        </button>
                                     </div>
                                 </div>
                             </div>

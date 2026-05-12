@@ -196,19 +196,45 @@ const WhatsAppAICenter = () => {
     // Socket Connection
     useEffect(() => {
         const socket = io(apiUrl, {
-            transports: ['polling'],
-            reconnectionAttempts: 10,
-            reconnectionDelay: 2000
+            transports: ['polling', 'websocket'],
+            reconnectionAttempts: 20,
+            reconnectionDelay: 1500
         });
-        socket.on("connect", () => console.log("✅ Socket Conectado"));
+
+        socket.on("connect", () => {
+            console.log("✅ Socket Conectado");
+        });
+
+        // Nova mensagem recebida/enviada em tempo real
         socket.on("nova_mensagem", (msg) => {
             setRealMessages(prev => {
                 if (prev.some(m => m.id === msg.id)) return prev;
                 return [msg, ...prev];
             });
+            // Atualiza o contato ativo imediatamente se for ele
+            setActiveContact((curr: any) => {
+                if (!curr) return curr;
+                if ((msg.de_raw || msg.de) === curr.id || (msg.fromMe && curr.id)) {
+                    return {
+                        ...curr,
+                        messages: [msg, ...(curr.messages || [])],
+                        lastMessageText: msg.texto,
+                        lastMessageTime: msg.horario,
+                        lastMessageFromMe: msg.fromMe,
+                    };
+                }
+                return curr;
+            });
         });
+
         socket.on("init_messages", (msgs) => setRealMessages(msgs));
-        socket.on("init_contacts", (contacts) => setAllContacts(contacts));
+
+        socket.on("init_contacts", (contacts) => {
+            if (contacts && contacts.length > 0) {
+                setAllContacts(contacts);
+            }
+        });
+
         socket.on("ia_sugestao", (data) => {
             if (activeContact && data.id_raw === activeContact.rawId) {
                 setInputMessage(data.sugestao);
@@ -216,12 +242,15 @@ const WhatsAppAICenter = () => {
                 toast.info("A IA preparou uma resposta!");
             }
         });
+
         socket.on("status_update", (data) => {
             if (data.status === 'conectado') {
                 setIsConnected(true);
             } else {
                 setIsConnected(false);
-                setRealMessages([]); // Limpa a lista da direita instantaneamente
+                setRealMessages([]);
+                setAllContacts([]);  // Limpa contatos ao desconectar
+                setActiveContact(null);
                 if (data.status === 'aguardando_qr' && data.qr_code_imagem) {
                     setQrStatus('ready');
                     setBackendQr(data.qr_code_imagem);
@@ -242,63 +271,30 @@ const WhatsAppAICenter = () => {
         });
 
         return () => { socket.disconnect(); };
-    }, [apiUrl, activeContact?.id]);
+    }, [apiUrl]);
 
-    // Initial Data & Fallback Polling
+    // Fallback: busca status e mensagens via HTTP (sem /api/contatos que foi removido)
     useEffect(() => {
         const loadData = async () => {
             try {
-                const resStatus = await fetch(`${apiUrl}/api/status`);
-                const data = await resStatus.json();
-                if (data.status === 'conectado') setIsConnected(true);
-
-                const resMsgs = await fetch(`${apiUrl}/api/mensagens`);
-                if (resMsgs.ok) setRealMessages(await resMsgs.json());
-
-                const resContacts = await fetch(`${apiUrl}/api/contatos`);
-                if (resContacts.ok) {
-                    const contacts = await resContacts.json();
-                    if (contacts.length > 0) setAllContacts(contacts);
+                const resStatus = await fetch(`${apiUrl}/api/status`, { cache: 'no-store' });
+                if (resStatus.ok) {
+                    const data = await resStatus.json();
+                    if (data.status === 'conectado') setIsConnected(true);
+                }
+                const resMsgs = await fetch(`${apiUrl}/api/mensagens`, { cache: 'no-store' });
+                if (resMsgs.ok) {
+                    const msgs = await resMsgs.json();
+                    if (msgs.length > 0) setRealMessages(msgs);
                 }
             } catch (err) { console.error("Erro no fetch inicial:", err); }
         };
-
         loadData();
-        const interval = setInterval(loadData, 5000); // Tenta atualizar a cada 5s se estiver vazio
+        const interval = setInterval(loadData, 5000);
         return () => clearInterval(interval);
     }, [apiUrl]);
 
-    // RESTAURADO: Buscar fotos de perfil e presença inicial
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!isConnected) return;
-            for (const contact of groupedContacts) {
-                // Fotos
-                if (profilePics[contact.id] === undefined) {
-                    try {
-                        const res = await fetch(`${apiUrl}/api/foto?id=${encodeURIComponent(contact.rawId)}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            setProfilePics(prev => ({ ...prev, [contact.id]: data.url || 'none' }));
-                        }
-                    } catch { }
-                }
-                // Presença (apenas se for o ativo ou a cada ciclo longo)
-                if (activeContact?.id === contact.id || presencas[contact.id] === undefined) {
-                    try {
-                        const res = await fetch(`${apiUrl}/api/presenca?id=${encodeURIComponent(contact.rawId)}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            setPresencas(prev => ({ ...prev, [contact.id]: data }));
-                        }
-                    } catch { }
-                }
-            }
-        };
-        if (groupedContacts.length > 0) fetchData();
-    }, [groupedContacts.length, isConnected, apiUrl, activeContact?.id]);
-
-    // Polling de presença para o contato ativo (a cada 5s para ser real-time)
+    // Presença do contato ativo (polling leve a cada 8s)
     useEffect(() => {
         if (!activeContact || !isConnected) return;
         const interval = setInterval(async () => {

@@ -128,65 +128,69 @@ function initWhatsApp() {
         qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
 
-        // Sincronização MASTER (Fiel ao WhatsApp Web)
         try {
-            console.log("⚡ Sincronização MASTER Iniciada...");
+            console.log("⚡ Sincronização Incremental Iniciada...");
 
-            // 1. Busca os CHATS ativos (é isso que define a ordem no Zap)
+            // 1. Busca a lista de chats (instantâneo)
             const chats = await client.getChats();
-            console.log(`📂 Processando ${chats.length} conversas...`);
+            console.log(`📂 ${chats.length} conversas encontradas.`);
 
-            // Limpa mensagens para não duplicar na carga inicial
+            // Limpa mensagens para carga inicial
             mensagensRecebidas = [];
 
-            // Pega fotos e mensagens em paralelo para os 60 mais recentes
-            const activeChatsProcessed = await Promise.all(chats.slice(0, 60).map(async (chat) => {
-                const peerId = chat.id._serialized;
-                if (!peerId || peerId.includes('@g.us')) return null;
-
-                const foto = await client.getProfilePicUrl(peerId).catch(() => null);
-
-                // Busca histórico real (últimas 20 mensagens)
-                const messages = await chat.fetchMessages({ limit: 20 });
-                for (const msg of messages) {
-                    await processarMensagemSync(msg, foto);
-                }
-
-                return {
-                    id: peerId,
-                    name: chat.name || "Sem Nome",
-                    number: peerId.split('@')[0],
-                    foto: foto,
-                    lastMessageTimestamp: chat.timestamp || 0
-                };
-            }));
-
-            const validChats = activeChatsProcessed.filter(c => c !== null);
-            contatosSalvos = validChats;
-
-            io.emit('init_messages', mensagensRecebidas);
-            io.emit('init_contacts', validChats);
-
-            console.log(`✅ Sincronização concluída: ${validChats.length} conversas organizadas.`);
-
-            // 2. Agenda completa (em background para contatos sem chat aberto)
-            const contacts = await client.getContacts().catch(() => []);
-            const agenda = contacts
+            // Mapeamento básico para UI não ficar vazia
+            const initialContacts = chats.slice(0, 80)
                 .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
                 .map(c => ({
                     id: c.id._serialized,
-                    name: c.name || c.pushname || c.number || "Sem Nome",
-                    number: c.number || (c.id ? c.id.user : ""),
-                    foto: null
+                    name: c.name || "Sem Nome",
+                    number: c.id.user,
+                    foto: null,
+                    lastMessageTimestamp: c.timestamp || 0
                 }));
 
-            // Mescla agenda com contatos salvos sem duplicar
-            agenda.forEach(ac => {
-                if (!contatosSalvos.find(cs => cs.id === ac.id)) {
-                    contatosSalvos.push(ac);
+            contatosSalvos = initialContacts;
+            io.emit('init_contacts', initialContacts); // ENVIADO IMEDIATAMENTE
+
+            // 2. Popula dados pesados em background de forma controlada
+            for (const cShort of initialContacts) {
+                (async () => {
+                    try {
+                        const chat = await client.getChatById(cShort.id);
+                        const foto = await client.getProfilePicUrl(cShort.id).catch(() => null);
+
+                        // Atualiza foto no cache
+                        const idx = contatosSalvos.findIndex(cs => cs.id === cShort.id);
+                        if (idx !== -1) {
+                            contatosSalvos[idx].foto = foto;
+                            io.emit('init_contacts', contatosSalvos);
+                        }
+
+                        // Busca histórico real
+                        const messages = await chat.fetchMessages({ limit: 15 });
+                        for (const msg of messages) {
+                            await processarMensagemSync(msg, foto);
+                        }
+                        io.emit('init_messages', mensagensRecebidas);
+                    } catch (e) { }
+                })();
+            }
+
+            // 3. Busca agenda completa no fim
+            const contacts = await client.getContacts().catch(() => []);
+            contacts.forEach(c => {
+                if (c && c.id && !c.id._serialized.includes('@g.us')) {
+                    if (!contatosSalvos.find(cs => cs.id === c.id._serialized)) {
+                        contatosSalvos.push({
+                            id: c.id._serialized,
+                            name: c.name || c.pushname || "Sem Nome",
+                            number: c.id.user,
+                            foto: null,
+                            lastMessageTimestamp: 0
+                        });
+                    }
                 }
             });
-
             io.emit('init_contacts', contatosSalvos);
 
         } catch (err) {

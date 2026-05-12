@@ -268,15 +268,19 @@ const Dashboard = () => {
         </div>
 
         {/* Navigation tabs */}
-        <div className="max-w-[1600px] mx-auto px-4 md:px-6 overflow-x-auto">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 overflow-x-auto custom-scrollbar">
           <div className="flex gap-1 pb-1">
             {TAB_CONFIG.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs font-medium whitespace-nowrap transition-all border-b-2 ${tab === t.key
-                  ? "border-primary text-primary bg-primary/5"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                  }`}>
-                <t.icon className="w-3.5 h-3.5" /> {t.label}
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex items-center gap-2 px-4 py-3 rounded-t-xl text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-300 border-b-2 relative group ${tab === t.key
+                  ? "border-blue-600 text-blue-600 bg-blue-50/80 shadow-[0_-4px_15px_-5px_rgba(37,99,235,0.15)]"
+                  : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-blue-50/40 hover:-translate-y-0.5"
+                  }`}
+              >
+                <t.icon className={`w-4.5 h-4.5 transition-all duration-300 group-hover:scale-125 ${tab === t.key ? 'text-blue-600 scale-110' : 'text-slate-400 group-hover:text-blue-500'}`} />
+                {t.label}
               </button>
             ))}
           </div>

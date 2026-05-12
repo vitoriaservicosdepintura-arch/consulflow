@@ -476,17 +476,16 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between gap-1">
-                                                    <h4 className="text-[13px] font-semibold text-slate-900 truncate flex-1">{c.name}</h4>
+                                                    <h4 className="text-[13px] font-semibold text-slate-900 truncate flex-1 leading-tight">{c.name}</h4>
                                                     <span className="text-[10px] text-slate-400 font-medium shrink-0">
                                                         {c.lastMessageTime || (c.messages.length > 0 ? c.messages[0].horario : "")}
                                                     </span>
                                                 </div>
+                                                <p className="text-[10px] text-indigo-600/70 font-bold tracking-tight mb-1">+{c.id.split('@')[0]}</p>
                                                 <div className="flex items-center gap-1">
-                                                    {(c.lastMessageFromMe || (c.messages.length > 0 && c.messages[0].fromMe)) && (
-                                                        <CheckCheck className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                                                    )}
+                                                    {c.lastMessageFromMe && <CheckCheck className="w-3.5 h-3.5 text-sky-500 shrink-0" />}
                                                     <p className="text-[12px] text-slate-500 truncate leading-snug">
-                                                        {c.lastMessageText || (c.messages.length > 0 ? c.messages[0].texto : "Sem conversas recentes")}
+                                                        {c.lastMessageText || "Sem conversas recentes"}
                                                     </p>
                                                 </div>
                                             </div>
@@ -513,7 +512,8 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
 
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-sm">{activeContact.name}</h3>
+                                                    <h3 className="font-bold text-sm leading-tight">{activeContact.name}</h3>
+                                                    <p className="text-[10px] text-indigo-600 font-bold mb-0.5">+{activeContact.id.split('@')[0]}</p>
                                                     <div className="flex items-center gap-1.5">
                                                         {presencas[activeContact.id]?.isOnline ? (
                                                             <div className="flex items-center gap-1">
@@ -660,7 +660,6 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
                 @keyframes pulse-animation {
                     0% { box-shadow: 0 0 0 0px rgba(251, 191, 36, 0.7); }
                     100% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
-                }
             `}</style>
         </div>
     );

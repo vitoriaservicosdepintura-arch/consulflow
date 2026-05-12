@@ -1,3 +1,4 @@
+// Dashboard Principal do Consuflow - Versão Otimizada
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLeads } from "@/contexts/LeadContext";

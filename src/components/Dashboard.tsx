@@ -21,6 +21,7 @@ import FollowUpSystem from "./FollowUpSystem";
 import WhatsAppAICenter from "./WhatsAppAICenter";
 import WhatsAppLeadImporter from "./WhatsAppLeadImporter";
 import EditorsHub from "./EditorsHub";
+import MarketingStudio from "./MarketingStudio";
 import { toast } from "sonner";
 
 
@@ -41,14 +42,14 @@ import {
   Building2, Search, Plus, Table2, Columns3, Download, LogOut, Filter,
   FileText, MessageSquare, MapPin, Globe, BarChart3, Sheet, User, Bell, Sparkles,
   FileSpreadsheet, Image as ImageIcon, FileCheck, FileSearch, Calendar as CalendarIcon,
-  RotateCcw, MessageCircle, UserPlus
+  RotateCcw, MessageCircle, UserPlus, Wand2
 } from "lucide-react";
 
 import { useEffect } from "react";
 
 import { LucideIcon } from "lucide-react";
 
-type Tab = "dashboard" | "leads" | "reports" | "messages" | "whatsapp-ia" | "editors" | "editor" | "spreadsheet" | "pdf-editor" | "scheduling" | "follow-up" | "maps" | "docs" | "profile";
+type Tab = "dashboard" | "leads" | "reports" | "messages" | "whatsapp-ia" | "marketing-studio" | "editors" | "editor" | "spreadsheet" | "pdf-editor" | "scheduling" | "follow-up" | "maps" | "docs" | "profile";
 
 
 
@@ -60,6 +61,7 @@ const TAB_CONFIG: { key: Tab; label: string; icon: LucideIcon }[] = [
   { key: "whatsapp-ia", label: "WhatsApp IA", icon: MessageCircle },
   { key: "messages", label: "Mensagens", icon: MessageSquare },
   { key: "editors", label: "Editores", icon: FileSearch },
+  { key: "marketing-studio", label: "Sala de Marketing", icon: Wand2 },
   { key: "scheduling", label: "Agendamentos", icon: CalendarIcon },
   { key: "follow-up", label: "Follow-ups", icon: RotateCcw },
   { key: "maps", label: "Maps", icon: MapPin },
@@ -410,6 +412,7 @@ const Dashboard = () => {
         {tab === "reports" && <PDFReports />}
         {tab === "whatsapp-ia" && <WhatsAppAICenter onImportLead={handleImportLead} />}
         {tab === "messages" && <MessagingSystem />}
+        {tab === "marketing-studio" && <MarketingStudio />}
         {tab === "editors" && <EditorsHub onSelect={setTab} />}
         {tab === "editor" && <TextEditor />}
         {tab === "spreadsheet" && <Spreadsheet />}

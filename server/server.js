@@ -142,7 +142,7 @@ function initWhatsApp() {
 
             console.log(`📂 Sincronizando apenas os ${recentChats.length} chats mais recentes...`);
 
-            // 3. Carga Ultra-Rápida de Resumo
+            // 3. Carga Ultra-Rápida de Resumo (nome já vem do chat)
             contatosSalvos = recentChats.map(c => ({
                 id: c.id._serialized,
                 name: c.name || "Sem Nome",
@@ -158,34 +158,45 @@ function initWhatsApp() {
             io.emit('status_update', { status: 'conectado' });
             io.emit('init_contacts', contatosSalvos);
 
-            // 4. Preenchimento de Detalhes em Background (Apenas para esses 50)
+            // 4. Preenchimento de Detalhes em Background (nome real, foto, histórico com mídia)
             (async () => {
                 for (let i = 0; i < contatosSalvos.length; i++) {
                     const c = contatosSalvos[i];
                     try {
                         const chatObj = await client.getChatById(c.id);
-                        const foto = await client.getProfilePicUrl(c.id).catch(() => null);
-                        const msgs = await chatObj.fetchMessages({ limit: 15 }).catch(() => []);
 
+                        // Nome real via API de contatos
+                        const contatoInfo = await client.getContactById(c.id).catch(() => null);
+                        const nomeReal = contatoInfo?.name || contatoInfo?.pushname || c.name || c.number;
+                        contatosSalvos[i].name = nomeReal;
+
+                        // Foto de perfil
+                        const foto = await client.getProfilePicUrl(c.id).catch(() => null);
                         contatosSalvos[i].foto = foto;
+
+                        // 30 mensagens de histórico com mídia completa
+                        const msgs = await chatObj.fetchMessages({ limit: 30 }).catch(() => []);
+
                         if (msgs.length > 0) {
                             const last = msgs[msgs.length - 1];
-                            contatosSalvos[i].lastMessageText = last.body;
+                            contatosSalvos[i].lastMessageText = last.body || _tipoMensagem(last.type);
                             contatosSalvos[i].lastMessageFromMe = last.fromMe;
                             contatosSalvos[i].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                             contatosSalvos[i].lastMessageTimestamp = last.timestamp * 1000;
 
                             for (const m of msgs) {
-                                await processarMensagemSync(m, foto);
+                                await processarMensagemSync(m, foto, nomeReal);
                             }
                         }
 
                         // Envia atualização incremental do contato
                         io.emit('init_contacts', contatosSalvos);
                         io.emit('init_messages', mensagensRecebidas);
-                    } catch (e) { }
+                    } catch (e) {
+                        console.error(`Erro contato ${c.id}:`, e.message);
+                    }
                 }
-                console.log("✅ Sincronização de conversas recentes concluída.");
+                console.log("✅ Sincronização completa com mídia concluída.");
             })();
 
         } catch (err) {
@@ -194,7 +205,18 @@ function initWhatsApp() {
         }
     });
 
-    async function processarMensagemSync(msg, fotoUrl) {
+    // Helper: descrição textual para tipos de mídia
+    function _tipoMensagem(type) {
+        const tipos = {
+            'image': '📷 Foto', 'video': '🎥 Vídeo', 'audio': '🎵 Áudio',
+            'ptt': '🎤 Mensagem de voz', 'document': '📄 Documento',
+            'sticker': '🎭 Sticker', 'call_log': '📞 Chamada',
+            'e2e_notification': '🔒 Mensagem segura', 'location': '📍 Localização',
+        };
+        return tipos[type] || '📎 Mídia';
+    }
+
+    async function processarMensagemSync(msg, fotoUrl, nomeContato) {
         const peerId = msg.fromMe ? msg.to : msg.from;
         if (!peerId || peerId.includes('@g.us')) return;
 
@@ -202,18 +224,36 @@ function initWhatsApp() {
 
         // SÓ processa mensagem se o contato for um dos RECENTES que já mapeamos
         if (contatoExistente) {
+            // Download de mídia completo: fotos, vídeos, áudios, docs, stickers
+            let mediaData = null;
+            const tiposMidia = ['image', 'video', 'audio', 'ptt', 'document', 'sticker'];
+            if (msg.hasMedia && tiposMidia.includes(msg.type)) {
+                try {
+                    const media = await msg.downloadMedia().catch(() => null);
+                    if (media) {
+                        mediaData = {
+                            mimetype: media.mimetype,
+                            data: media.data,
+                            filename: media.filename || null
+                        };
+                    }
+                } catch (e) { /* ignora erros de download */ }
+            }
+
+            const textoExibivel = msg.body || (msg.hasMedia ? _tipoMensagem(msg.type) : '');
+
             const novaMsg = {
                 id: msg.id.id,
                 de_raw: peerId,
                 fromMe: msg.fromMe,
-                nome: contatoExistente.name,
+                nome: nomeContato || contatoExistente.name,
                 foto: fotoUrl || contatoExistente.foto,
-                texto: msg.body,
+                texto: textoExibivel,
                 horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: msg.timestamp,
                 type: msg.type,
                 hasMedia: msg.hasMedia,
-                media: null
+                media: mediaData
             };
 
             if (!mensagensRecebidas.some(m => m.id === novaMsg.id)) {

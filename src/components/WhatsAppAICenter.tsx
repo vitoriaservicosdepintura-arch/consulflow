@@ -144,26 +144,10 @@ const WhatsAppAICenter = () => {
 
     // Agrupar mensagens por contato e mesclar com a agenda completa
     const groupedContacts = (() => {
-        const acc = realMessages.reduce((acc: any, msg: any) => {
-            const key = msg.de_raw || msg.de;
-            if (key === 'me') return acc;
-            if (!acc[key]) {
-                acc[key] = {
-                    id: key,
-                    number: msg.de || key.split('@')[0],
-                    rawId: key,
-                    name: msg.nome || key.split('@')[0],
-                    photo: msg.foto,
-                    messages: []
-                };
-            }
-            acc[key].messages.push(msg);
-            return acc;
-        }, {});
-
-        // Adicionar contatos da agenda que não estão nas mensagens
+        // 1. COMEÇAMOS APENAS COM OS 50 RECENTES AUTORIZADOS PELO SERVIDOR
+        const acc: any = {};
         allContacts.forEach(c => {
-            if (!acc[c.id]) {
+            if (c && c.id) {
                 acc[c.id] = {
                     id: c.id,
                     number: c.number,
@@ -171,8 +155,25 @@ const WhatsAppAICenter = () => {
                     name: c.name,
                     photo: c.foto,
                     lastMessageTimestamp: c.lastMessageTimestamp || 0,
+                    lastMessageTime: c.lastMessageTime || "",
+                    lastMessageText: c.lastMessageText || "",
+                    lastMessageFromMe: c.lastMessageFromMe || false,
                     messages: []
                 };
+            }
+        });
+
+        // 2. ADICIONAMOS MENSAGENS APENAS SE O CONTATO ESTIVER NA LISTA ACIMA
+        realMessages.forEach((msg: any) => {
+            const key = msg.de_raw || msg.de;
+            if (key !== 'me' && acc[key]) {
+                acc[key].messages.push(msg);
+                // Atualiza o texto da última mensagem se for mais recente que o atual
+                if (msg.timestamp * 1000 > acc[key].lastMessageTimestamp) {
+                    acc[key].lastMessageText = msg.texto;
+                    acc[key].lastMessageFromMe = msg.fromMe;
+                    acc[key].lastMessageTime = msg.horario;
+                }
             }
         });
 

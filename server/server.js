@@ -198,45 +198,30 @@ function initWhatsApp() {
         const peerId = msg.fromMe ? msg.to : msg.from;
         if (!peerId || peerId.includes('@g.us')) return;
 
-        const contato = await client.getContactById(peerId).catch(() => null);
-        const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
+        const contatoExistente = contatosSalvos.find(c => c.id === peerId);
 
-        const novaMsg = {
-            id: msg.id.id,
-            de_raw: peerId,
-            fromMe: msg.fromMe,
-            nome: nome,
-            foto: fotoUrl,
-            texto: msg.body,
-            horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            timestamp: msg.timestamp,
-            type: msg.type,
-            hasMedia: msg.hasMedia,
-            media: null // Por performance, não baixar mídia no sync inicial
-        };
+        // SÓ processa mensagem se o contato for um dos RECENTES que já mapeamos
+        if (contatoExistente) {
+            const novaMsg = {
+                id: msg.id.id,
+                de_raw: peerId,
+                fromMe: msg.fromMe,
+                nome: contatoExistente.name,
+                foto: fotoUrl || contatoExistente.foto,
+                texto: msg.body,
+                horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: msg.timestamp,
+                type: msg.type,
+                hasMedia: msg.hasMedia,
+                media: null
+            };
 
-        if (!mensagensRecebidas.some(m => m.id === novaMsg.id)) {
-            mensagensRecebidas.push(novaMsg);
-            mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
+            if (!mensagensRecebidas.some(m => m.id === novaMsg.id)) {
+                mensagensRecebidas.push(novaMsg);
+                mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
+            }
         }
     }
-
-    app.get('/api/contatos', async (req, res) => {
-        try {
-            const contacts = await client.getContacts();
-            const simplified = contacts
-                .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                .map(c => ({
-                    id: c.id._serialized,
-                    name: c.name || c.pushname || c.number || "Sem Nome",
-                    number: c.number || (c.id ? c.id.user : ""),
-                    foto: null
-                }));
-            res.json(simplified);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    });
 
     client.on('presence_update', async (presence) => {
         const id_raw = presence.id._serialized;

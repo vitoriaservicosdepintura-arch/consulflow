@@ -99,11 +99,11 @@ const WhatsAppConnect = () => {
             {/* QR CODE */}
             {status === 'aguardando_qr' && qrCode && !isResetting && (
                 <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
-                    <div className="p-3 bg-white rounded-2xl shadow-lg inline-block border border-border">
+                    <div className="p-4 bg-white rounded-3xl shadow-2xl inline-block border-4 border-emerald-500/10 transition-all hover:scale-[1.02]">
                         <img
                             src={qrCode}
                             alt="QR Code WhatsApp"
-                            className="w-[220px] h-[220px]"
+                            className="w-[280px] h-[280px] md:w-[320px] md:h-[320px] rounded-xl object-contain shadow-inner"
                             onError={(e) => console.error('Erro ao carregar QR:', e)}
                         />
                     </div>

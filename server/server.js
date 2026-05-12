@@ -156,7 +156,14 @@ function initWhatsApp() {
     client.on('qr', async (qr) => {
         console.log("📲 QR Gerado");
         qrCodeData = qr;
-        const qrImage = await qrcode.toDataURL(qr);
+        const qrImage = await qrcode.toDataURL(qr, {
+            margin: 2,
+            scale: 12,
+            color: {
+                dark: '#000000',
+                light: '#ffffff'
+            }
+        });
         io.emit('status_update', { status: 'aguardando_qr', qr_code_imagem: qrImage });
     });
 

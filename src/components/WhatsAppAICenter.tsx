@@ -180,7 +180,8 @@ const WhatsAppAICenter = () => {
             .filter((c: any) => {
                 const q = contactSearch.toLowerCase();
                 return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
-            }) as any[];
+            })
+            .sort((a: any, b: any) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0)) as any[];
     })();
 
     // Sincroniza o contato ativo caso novas mensagens cheguem

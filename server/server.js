@@ -123,62 +123,73 @@ function initWhatsApp() {
     });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp CONECTADO - Mantendo Ordem do Celular');
+        console.log('✅ WhatsApp CONECTADO - Apenas Chats Recentes');
         isConnected = true;
         qrCodeData = '';
 
+        // 1. Limpa tudo para garantir que não tenha lixo da agenda anterior
+        contatosSalvos = [];
+        mensagensRecebidas = [];
+
         try {
-            const chats = await client.getChats();
+            // 2. Busca APENAS os chats (Conversas Ativas)
+            const allChats = await client.getChats();
 
-            // 1. MAPEAMENTO INICIAL (Mantendo a ordem fiel do array 'chats')
-            contatosSalvos = chats
+            // Filtramos apenas os 50 mais RECENTES e que não sejam grupos
+            const recentChats = allChats
                 .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                .map(c => ({
-                    id: c.id._serialized,
-                    name: c.name || "Sem Nome",
-                    number: c.id.user,
-                    foto: null,
-                    lastMessageTimestamp: c.timestamp * 1000, // Converte para ms
-                    lastMessageText: "",
-                    lastMessageFromMe: false,
-                    lastMessageTime: new Date(c.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                }));
+                .slice(0, 50);
 
-            // Avisa o front IMEDIATAMENTE com a ordem do celular
+            console.log(`📂 Sincronizando apenas os ${recentChats.length} chats mais recentes...`);
+
+            // 3. Carga Ultra-Rápida de Resumo
+            contatosSalvos = recentChats.map(c => ({
+                id: c.id._serialized,
+                name: c.name || "Sem Nome",
+                number: c.id.user,
+                foto: null,
+                lastMessageTimestamp: c.timestamp * 1000,
+                lastMessageText: "",
+                lastMessageFromMe: false,
+                lastMessageTime: new Date(c.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            }));
+
+            // Destrava a tela IMEDIATAMENTE com os nomes
             io.emit('status_update', { status: 'conectado' });
             io.emit('init_contacts', contatosSalvos);
 
-            // 2. CARGA DE DETALHES (Background, mas sem mudar a ordem)
+            // 4. Preenchimento de Detalhes em Background (Apenas para esses 50)
             (async () => {
-                for (let i = 0; i < Math.min(contatosSalvos.length, 50); i++) {
+                for (let i = 0; i < contatosSalvos.length; i++) {
                     const c = contatosSalvos[i];
                     try {
                         const chatObj = await client.getChatById(c.id);
                         const foto = await client.getProfilePicUrl(c.id).catch(() => null);
-                        const lastMsgs = await chatObj.fetchMessages({ limit: 10 }).catch(() => []);
+                        const msgs = await chatObj.fetchMessages({ limit: 15 }).catch(() => []);
 
                         contatosSalvos[i].foto = foto;
-                        if (lastMsgs.length > 0) {
-                            const last = lastMsgs[lastMsgs.length - 1];
+                        if (msgs.length > 0) {
+                            const last = msgs[msgs.length - 1];
                             contatosSalvos[i].lastMessageText = last.body;
                             contatosSalvos[i].lastMessageFromMe = last.fromMe;
                             contatosSalvos[i].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                             contatosSalvos[i].lastMessageTimestamp = last.timestamp * 1000;
+
+                            for (const m of msgs) {
+                                await processarMensagemSync(m, foto);
+                            }
                         }
 
-                        for (const m of lastMsgs) {
-                            await processarMensagemSync(m, foto);
-                        }
-
-                        // Emite a cada contato processado para atualizar as fotos
+                        // Envia atualização incremental do contato
                         io.emit('init_contacts', contatosSalvos);
                         io.emit('init_messages', mensagensRecebidas);
                     } catch (e) { }
                 }
+                console.log("✅ Sincronização de conversas recentes concluída.");
             })();
 
         } catch (err) {
-            console.error("Erro na carga:", err);
+            console.error("Erro na sincronização:", err);
             io.emit('status_update', { status: 'conectado' });
         }
     });

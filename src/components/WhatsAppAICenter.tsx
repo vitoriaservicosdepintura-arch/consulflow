@@ -181,14 +181,15 @@ const WhatsAppAICenter = () => {
                 return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
             })
             .sort((a: any, b: any) => {
-                // Se ambos têm mensagens, ordena pela mais recente
-                if (a.messages.length > 0 && b.messages.length > 0) {
-                    return b.messages[0].timestamp - a.messages[0].timestamp;
+                // Ordenação estritamente por mensagem mais recente (estilo WhatsApp Web)
+                const lastA = a.messages[0]?.timestamp || 0;
+                const lastB = b.messages[0]?.timestamp || 0;
+
+                if (lastA !== lastB) {
+                    return lastB - lastA;
                 }
-                // Se apenas um tem, ele vai pro topo
-                if (a.messages.length > 0) return -1;
-                if (b.messages.length > 0) return 1;
-                // Se nenhum tem, ordem alfabética
+
+                // Se nenhum tem mensagem, ordem alfabética
                 return a.name.localeCompare(b.name);
             }) as any[];
     })();
@@ -440,8 +441,22 @@ const WhatsAppAICenter = () => {
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h4 className="text-xs font-bold truncate">{c.name}</h4>
-                                                <p className="text-[10px] text-slate-500 truncate">{c.messages[c.messages.length - 1]?.texto}</p>
+                                                <div className="flex items-center justify-between gap-1">
+                                                    <h4 className="text-[13px] font-semibold text-slate-900 truncate flex-1">{c.name}</h4>
+                                                    {c.messages.length > 0 && (
+                                                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                                                            {c.messages[0].horario}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {c.messages.length > 0 && c.messages[0].fromMe && (
+                                                        <CheckCheck className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                                                    )}
+                                                    <p className="text-[12px] text-slate-500 truncate leading-snug">
+                                                        {c.messages.length > 0 ? c.messages[0].texto : "Sem conversas recentes"}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -449,11 +464,11 @@ const WhatsAppAICenter = () => {
                             </div>
 
                             {/* Chat Area */}
-                            <div className="flex-1 flex flex-col bg-[#e5ddd5] relative">
-                                <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
+                            <div className="flex-1 flex flex-col bg-[#efeae2] relative">
+                                <div className="absolute inset-0 opacity-[0.4] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat" />
                                 {activeContact ? (
                                     <>
-                                        <div className="h-16 px-4 bg-[#f0f2f5] border-b flex items-center justify-between shadow-sm z-10">
+                                        <div className="h-16 px-4 bg-[#f0f2f5] border-b flex items-center justify-between shadow-[0_1px_3px_rgba(0,0,0,0.08)] z-10">
                                             <div className="flex items-center gap-3">
                                                 <button onClick={() => setActiveContact(null)} className="md:hidden"><ArrowLeft /></button>
                                                 <div className="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center font-bold text-white overflow-hidden shadow-sm">

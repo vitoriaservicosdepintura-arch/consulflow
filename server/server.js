@@ -71,13 +71,13 @@ function initWhatsApp() {
             const peerId = msg.fromMe ? msg.to : msg.from;
             if (!peerId || peerId.includes('@g.us')) return;
 
-            // Cache básico para não repetir chamadas de contato/foto na mesma execução
             const contato = await client.getContactById(peerId).catch(() => null);
             const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
 
             let fotoUrl = null;
             try {
-                fotoUrl = await client.getProfilePicUrl(peerId);
+                // Tenta pegar do cache ou busca se não tiver
+                fotoUrl = await client.getProfilePicUrl(peerId).catch(() => null);
             } catch (e) { }
 
             let mediaData = null;
@@ -93,7 +93,7 @@ function initWhatsApp() {
                 de_raw: peerId,
                 fromMe: msg.fromMe,
                 nome: nome,
-                foto: fotoUrl, // Incluir foto diretamente
+                foto: fotoUrl,
                 texto: msg.body,
                 horario: new Date(msg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: msg.timestamp,
@@ -106,7 +106,7 @@ function initWhatsApp() {
             if (index === -1) {
                 mensagensRecebidas.push(novaMsg);
                 mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
-                if (mensagensRecebidas.length > 500) mensagensRecebidas.pop();
+                if (mensagensRecebidas.length > 2000) mensagensRecebidas.pop(); // Aumentado limite de cache
 
                 if (emitir) io.emit('nova_mensagem', novaMsg);
             }
@@ -128,11 +128,41 @@ function initWhatsApp() {
         qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
 
-        // Fase 1: Sincronização Instantânea de Chats e Agenda
+        // Sincronização Profunda e Imediata
         try {
-            console.log("⚡ Sincronizando chats e contatos imediatamente...");
+            console.log("⚡ Sincronização Profunda Iniciada...");
 
-            // Busca contatos (agenda) imediatamente
+            // 1. Chats Ativos com Histórico e Fotos
+            const chats = await client.getChats();
+            const activeChats = chats.slice(0, 50); // Pega os 50 mais recentes
+
+            console.log(`📂 Carregando histórico de ${activeChats.length} conversas...`);
+
+            // Processa fotos de perfil em paralelo para ser rápido
+            const profilePicPromises = activeChats.map(chat =>
+                client.getProfilePicUrl(chat.id._serialized).catch(() => null)
+            );
+            const profilePics = await Promise.all(profilePicPromises);
+
+            for (let i = 0; i < activeChats.length; i++) {
+                const chat = activeChats[i];
+                const foto = profilePics[i];
+                const peerId = chat.id._serialized;
+
+                if (peerId.includes('@g.us')) continue;
+
+                // Carrega até 20 mensagens por conversa para ter histórico real
+                const messages = await chat.fetchMessages({ limit: 20 });
+                for (const msg of messages) {
+                    await processarMensagemSync(msg, foto);
+                }
+            }
+
+            io.emit('init_messages', mensagensRecebidas);
+            console.log(`✅ Histórico carregado. Total: ${mensagensRecebidas.length} mensagens.`);
+
+            // 2. Agenda Completa em segundo plano (sem travar)
+            console.log("🔄 Mapeando agenda completa...");
             const contacts = await client.getContacts();
             const simplifiedContacts = contacts
                 .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
@@ -140,29 +170,15 @@ function initWhatsApp() {
                     id: c.id._serialized,
                     name: c.name || c.pushname || c.number || "Sem Nome",
                     number: c.number || (c.id ? c.id.user : ""),
-                    foto: null
+                    foto: null // As fotos da agenda virão sob demanda ou depois
                 }));
 
             contatosSalvos = simplifiedContacts;
             io.emit('init_contacts', simplifiedContacts);
-            console.log(`✅ Agenda carregada: ${simplifiedContacts.length} contatos.`);
+            console.log(`✅ Agenda finalizada: ${simplifiedContacts.length} contatos.`);
 
-            // Busca mensagens dos chats recentes
-            const chats = await client.getChats();
-            const syncChats = chats.slice(0, 30);
-            const cacheFotos = {};
-
-            for (const chat of syncChats) {
-                const peerId = chat.id._serialized;
-                if (peerId.includes('@g.us')) continue;
-                const messages = await chat.fetchMessages({ limit: 2 });
-                for (const msg of messages) {
-                    await processarMensagemSync(msg, null);
-                }
-            }
-            io.emit('init_messages', mensagensRecebidas);
         } catch (err) {
-            console.error("Erro na sincronização inicial:", err);
+            console.error("Erro na sincronização profunda:", err);
         }
     });
 

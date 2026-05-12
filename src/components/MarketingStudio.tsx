@@ -119,57 +119,57 @@ const MarketingStudio = () => {
     };
 
     return (
-        <div className="flex flex-col min-h-[800px] bg-[#0D0D0D] text-[#F5F0E8] rounded-[2rem] overflow-hidden border border-emerald-500/10 shadow-2xl font-['DM_Sans',sans-serif]">
+        <div className="flex flex-col min-h-[800px] bg-background text-foreground rounded-[2rem] overflow-hidden border border-border shadow-2xl font-['Inter',sans-serif]">
             {/* Inner Header/Nav based on provided HTML */}
-            <div className="flex border-b border-white/5 bg-[#161616]/50 backdrop-blur-md">
-                <div className="flex items-center gap-6 p-4 px-8 border-r border-white/5">
+            <div className="flex border-b border-border bg-card/50 backdrop-blur-md">
+                <div className="flex items-center gap-6 p-4 px-8 border-r border-border">
                     <div className="flex flex-col">
-                        <span className="font-['Playfair_Display',serif] text-xl text-[#C9A84C] font-bold">ConsuFlow</span>
-                        <span className="text-[9px] uppercase tracking-[0.2em] text-[#7A7060]">AI Marketing Studio</span>
+                        <span className="font-['Playfair_Display',serif] text-xl text-primary font-bold">ConsuFlow</span>
+                        <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">AI Marketing Studio</span>
                     </div>
                 </div>
                 <div className="flex-1 flex items-center px-4 gap-2 overflow-x-auto no-scrollbar">
                     <button
                         onClick={() => setCurrentView('studio')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'studio' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'studio' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary'}`}
                     >
                         <Wand2 className="w-4 h-4" /> Estúdio IA
                     </button>
                     <button
                         onClick={() => setCurrentView('carousel')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'carousel' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'carousel' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary'}`}
                     >
                         <Layout className="w-4 h-4" /> Carrossel
                     </button>
                     <button
                         onClick={() => setCurrentView('ads')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'ads' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'ads' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary'}`}
                     >
                         <Megaphone className="w-4 h-4" /> Anúncios
                     </button>
                     <button
                         onClick={() => setCurrentView('gallery')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'gallery' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'gallery' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary'}`}
                     >
                         <ImageIcon className="w-4 h-4" /> Galeria
                     </button>
                     <button
                         onClick={() => setCurrentView('analytics')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'analytics' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'analytics' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary'}`}
                     >
                         <BarChart3 className="w-4 h-4" /> Analytics
                     </button>
                     <button
                         onClick={() => setCurrentView('brand')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'brand' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'brand' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary'}`}
                     >
                         <Palette className="w-4 h-4" /> Branding
                     </button>
                 </div>
-                <div className="flex items-center gap-3 px-6 border-l border-white/5">
+                <div className="flex items-center gap-3 px-6 border-l border-border">
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-full border border-amber-500/20">
-                        <Bolt className="w-3.5 h-3.5 text-[#C9A84C]" />
-                        <span className="text-[10px] font-bold text-[#C9A84C]">47 CRÉDITOS</span>
+                        <Bolt className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-[10px] font-bold text-amber-600">47 CRÉDITOS</span>
                     </div>
                 </div>
             </div>
@@ -179,12 +179,12 @@ const MarketingStudio = () => {
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex items-end justify-between mb-8">
                             <div>
-                                <h1 className="text-4xl font-['Playfair_Display',serif] text-white">Estúdio de Criação <span className="text-[#C9A84C]">IA</span></h1>
-                                <p className="text-[#7A7060] text-sm mt-1">Gere imagens, posts e artes profissionais com inteligência artificial</p>
+                                <h1 className="text-4xl font-['Playfair_Display',serif] text-foreground">Estúdio de Criação <span className="text-primary">IA</span></h1>
+                                <p className="text-muted-foreground text-sm mt-1">Gere imagens, posts e artes profissionais com inteligência artificial</p>
                             </div>
                             <button
                                 onClick={openSuggestionsModal}
-                                className="flex items-center gap-2 px-4 py-2 border border-[#C9A84C]/30 text-[#C9A84C] rounded-xl text-xs font-bold hover:bg-[#C9A84C]/5 transition-all"
+                                className="flex items-center gap-2 px-4 py-2 border border-primary/30 text-primary rounded-xl text-xs font-bold hover:bg-primary/5 transition-all"
                             >
                                 <Lightbulb className="w-4 h-4" /> Sugerir Prompt com IA
                             </button>
@@ -193,14 +193,14 @@ const MarketingStudio = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             {/* Canvas Area */}
                             <div className="lg:col-span-2 space-y-4">
-                                <div className="bg-[#161616] border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                                    <div className="flex items-center justify-between p-4 px-6 border-b border-white/5">
-                                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#B8B0A0]">
-                                            <ImageIcon className="w-4 h-4 text-[#C9A84C]" /> Canvas de Criação
+                                <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl">
+                                    <div className="flex items-center justify-between p-4 px-6 border-b border-border">
+                                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                            <ImageIcon className="w-4 h-4 text-primary" /> Canvas de Criação
                                         </div>
                                         <div className="flex gap-2">
-                                            <button className="p-2 hover:bg-white/5 rounded-lg transition-all text-[#B8B0A0]"><Download className="w-4 h-4" /></button>
-                                            <button className="p-2 hover:bg-white/5 rounded-lg transition-all text-[#B8B0A0]"><Bookmark className="w-4 h-4" /></button>
+                                            <button className="p-2 hover:bg-secondary rounded-lg transition-all text-muted-foreground"><Download className="w-4 h-4" /></button>
+                                            <button className="p-2 hover:bg-secondary rounded-lg transition-all text-muted-foreground"><Bookmark className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                     <div className="p-6">
@@ -209,7 +209,7 @@ const MarketingStudio = () => {
                                                 <button
                                                     key={ratio}
                                                     onClick={() => setCurrentFormat(ratio)}
-                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-bold transition-all ${currentFormat === ratio ? 'bg-[#C9A84C]/10 border-[#C9A84C] text-[#C9A84C]' : 'border-white/5 text-[#7A7060] hover:border-white/10'}`}
+                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-bold transition-all ${currentFormat === ratio ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:border-border'}`}
                                                 >
                                                     {ratio === '1/1' ? 'FEED (1:1)' : ratio === '9/16' ? 'STORY (9:16)' : ratio === '16/9' ? 'BANNER (16:9)' : 'PORTRAIT (4:5)'}
                                                 </button>
@@ -217,19 +217,19 @@ const MarketingStudio = () => {
                                         </div>
 
                                         <div
-                                            className="bg-[#1E1E1E] rounded-2xl flex items-center justify-center relative overflow-hidden transition-all duration-500 shadow-inner group"
+                                            className="bg-secondary rounded-2xl flex items-center justify-center relative overflow-hidden transition-all duration-500 shadow-inner group"
                                             style={{ aspectRatio: currentFormat }}
                                         >
                                             {!isLoading && !generatedImageUrl && (
                                                 <div className="text-center p-8">
-                                                    <Wand2 className="w-16 h-16 text-[#7A7060]/20 mx-auto mb-4" />
-                                                    <p className="text-[#7A7060] text-sm leading-relaxed">Configure as opções ao lado e clique em<br /><span className="text-[#C9A84C] font-bold">Gerar Arte com IA</span> para criar sua imagem</p>
+                                                    <Wand2 className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                                                    <p className="text-muted-foreground text-sm leading-relaxed">Configure as opções ao lado e clique em<br /><span className="text-primary font-bold">Gerar Arte com IA</span> para criar sua imagem</p>
                                                 </div>
                                             )}
                                             {isLoading && (
                                                 <div className="text-center space-y-4">
-                                                    <div className="w-12 h-12 border-4 border-[#C9A84C] border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_15px_rgba(201,168,76,0.3)]" />
-                                                    <p className="text-[11px] font-bold tracking-[0.2em] text-[#C9A84C] animate-pulse">GERANDO ARTE...</p>
+                                                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_15px_rgba(37,99,235,0.3)]" />
+                                                    <p className="text-[11px] font-bold tracking-[0.2em] text-primary animate-pulse">GERANDO ARTE...</p>
                                                 </div>
                                             )}
                                             {generatedImageUrl && !isLoading && (
@@ -238,13 +238,13 @@ const MarketingStudio = () => {
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-3 mt-6">
-                                            <button className="flex items-center justify-center gap-2 py-3 bg-white/5 rounded-xl text-[11px] font-bold text-[#B8B0A0] hover:bg-white/10 transition-all">
+                                            <button className="flex items-center justify-center gap-2 py-3 bg-secondary rounded-xl text-[11px] font-bold text-muted-foreground hover:bg-secondary transition-all">
                                                 <RefreshCw className="w-3.5 h-3.5" /> REGENERAR
                                             </button>
-                                            <button className="flex items-center justify-center gap-2 py-3 bg-white/5 rounded-xl text-[11px] font-bold text-[#B8B0A0] hover:bg-white/10 transition-all">
+                                            <button className="flex items-center justify-center gap-2 py-3 bg-secondary rounded-xl text-[11px] font-bold text-muted-foreground hover:bg-secondary transition-all">
                                                 <Share2 className="w-3.5 h-3.5" /> COMPARTILHAR
                                             </button>
-                                            <button className="flex items-center justify-center gap-2 py-3 bg-white/5 rounded-xl text-[11px] font-bold text-[#B8B0A0] hover:bg-white/10 transition-all">
+                                            <button className="flex items-center justify-center gap-2 py-3 bg-secondary rounded-xl text-[11px] font-bold text-muted-foreground hover:bg-secondary transition-all">
                                                 <Clock className="w-3.5 h-3.5" /> AGENDAR
                                             </button>
                                         </div>
@@ -254,30 +254,30 @@ const MarketingStudio = () => {
 
                             {/* Sidebar Controls */}
                             <div className="space-y-6">
-                                <div className="bg-[#161616] border border-white/5 rounded-3xl p-6 shadow-xl">
-                                    <div className="text-[10px] font-bold uppercase tracking-widest text-[#B8B0A0] mb-4 flex items-center gap-2">
-                                        <Type className="w-4 h-4 text-[#C9A84C]" /> Prompt & Configurações
+                                <div className="bg-card border border-border rounded-3xl p-6 shadow-xl">
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                                        <Type className="w-4 h-4 text-primary" /> Prompt & Configurações
                                     </div>
 
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A7060]">Descreva sua arte</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Descreva sua arte</label>
                                             <textarea
                                                 value={prompt}
                                                 onChange={(e) => setPrompt(e.target.value)}
-                                                className="w-full bg-[#1E1E1E] border border-white/5 rounded-2xl p-4 text-xs text-white outline-none focus:border-[#C9A84C]/30 transition-all min-h-[120px] resize-none custom-scrollbar"
+                                                className="w-full bg-secondary border border-border rounded-2xl p-4 text-xs text-foreground outline-none focus:border-primary/30 transition-all min-h-[120px] resize-none custom-scrollbar"
                                                 placeholder="Ex: Consultor de negócios moderno em escritório premium, estilo fotográfico, iluminação suave..."
                                             />
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A7060]">Estilo Visual</label>
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Estilo Visual</label>
                                             <div className="flex flex-wrap gap-2">
                                                 {['Fotográfico', 'Minimalista', 'Corporativo', 'Luxo Premium', 'Editorial'].map(style => (
                                                     <button
                                                         key={style}
                                                         onClick={() => togglePill(style)}
-                                                        className={`px-3 py-1.5 rounded-full border text-[11px] transition-all ${activeStyles.includes(style) ? 'bg-[#C9A84C]/10 border-[#C9A84C] text-[#C9A84C]' : 'border-white/5 text-[#7A7060] hover:border-white/10'}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-[11px] transition-all ${activeStyles.includes(style) ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:border-border'}`}
                                                     >
                                                         {style}
                                                     </button>
@@ -286,8 +286,8 @@ const MarketingStudio = () => {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold uppercase tracking-wider text-[#7A7060]">Tom da Mensagem</label>
-                                            <select className="w-full bg-[#1E1E1E] border border-white/5 rounded-xl p-3 text-xs text-[#B8B0A0] outline-none appearance-none cursor-pointer">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tom da Mensagem</label>
+                                            <select className="w-full bg-secondary border border-border rounded-xl p-3 text-xs text-muted-foreground outline-none appearance-none cursor-pointer">
                                                 <option>Profissional & Confiante</option>
                                                 <option>Moderno & Inovador</option>
                                                 <option>Elegante & Premium</option>
@@ -296,20 +296,20 @@ const MarketingStudio = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-[#161616] border border-white/5 rounded-3xl p-6 shadow-xl">
-                                    <div className="text-[10px] font-bold uppercase tracking-widest text-[#B8B0A0] mb-4 flex items-center gap-2">
-                                        <CloudUpload className="w-4 h-4 text-[#C9A84C]" /> Referências
+                                <div className="bg-card border border-border rounded-3xl p-6 shadow-xl">
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                                        <CloudUpload className="w-4 h-4 text-primary" /> Referências
                                     </div>
-                                    <div className="border border-dashed border-[#C9A84C]/20 bg-[#1E1E1E] rounded-2xl p-6 text-center cursor-pointer hover:bg-[#C9A84C]/5 transition-all group">
-                                        <CloudUpload className="mx-auto w-8 h-8 text-[#7A7060] mb-2 group-hover:text-[#C9A84C]/50 transition-colors" />
-                                        <p className="text-[11px] text-[#7A7060]">Arraste ou clique para carregar imagens</p>
+                                    <div className="border border-dashed border-primary/20 bg-secondary rounded-2xl p-6 text-center cursor-pointer hover:bg-primary/5 transition-all group">
+                                        <CloudUpload className="mx-auto w-8 h-8 text-muted-foreground mb-2 group-hover:text-primary/50 transition-colors" />
+                                        <p className="text-[11px] text-muted-foreground">Arraste ou clique para carregar imagens</p>
                                     </div>
                                 </div>
 
                                 <button
                                     onClick={handleGenerateImage}
                                     disabled={isLoading}
-                                    className="w-full bg-[#C9A84C] text-[#0D0D0D] py-4 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(201,168,76,0.3)] hover:bg-[#F2D98A] hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-3"
+                                    className="w-full bg-primary text-primary-foreground py-4 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(37,99,235,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 disabled:shadow-none flex items-center justify-center gap-3"
                                 >
                                     <Sparkles className="w-5 h-5" /> Gerar Arte com IA
                                 </button>
@@ -404,10 +404,10 @@ const MarketingStudio = () => {
                                             <div className="text-[9px] text-[#7A7060] flex items-center gap-1">Patrocinado <Globe className="w-2 h-2" /></div>
                                         </div>
                                     </div>
-                                    <div className="aspect-square bg-gradient-to-br from-[#1a1200] to-[#2d2000] p-10 flex flex-col items-center justify-center text-center">
-                                        <h2 className="text-xl font-['Playfair_Display',serif] text-[#C9A84C] mb-4 leading-tight">{adHeadline}</h2>
-                                        <p className="text-[10px] text-[#B8B0A0] leading-relaxed mb-6 italic">"{adBody}"</p>
-                                        <div className="px-6 py-2 bg-[#C9A84C] text-[#0D0D0D] text-[10px] font-black rounded-lg shadow-lg uppercase tracking-widest">{adCta}</div>
+                                    <div className="aspect-square bg-gradient-to-br from-primary/20 to-secondary p-10 flex flex-col items-center justify-center text-center">
+                                        <h2 className="text-xl font-['Playfair_Display',serif] text-primary mb-4 leading-tight">{adHeadline}</h2>
+                                        <p className="text-[10px] text-muted-foreground leading-relaxed mb-6 italic">"{adBody}"</p>
+                                        <div className="px-6 py-2 bg-primary text-primary-foreground text-[10px] font-black rounded-lg shadow-lg uppercase tracking-widest">{adCta}</div>
                                     </div>
                                 </div>
                             </div>

@@ -123,62 +123,68 @@ function initWhatsApp() {
     });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp PRONTO!');
+        console.log('✅ WhatsApp CONECTADO - Sincronização Progressiva');
         isConnected = true;
         qrCodeData = '';
 
-        // ENVIA STATUS IMEDIATO (DESTRAVA A TELA!)
+        // 1. AVISO IMEDIATO NA TELA (0ms)
         io.emit('status_update', { status: 'conectado' });
-        io.emit('init_contacts', contatosSalvos || []);
 
-        // Sincronização em background (Não trava o carregamento)
-        (async () => {
-            try {
-                console.log("⚡ Iniciando Sincronização em Background...");
-                const chats = await client.getChats();
+        try {
+            // 2. CARGA ESTRUTURAL (Vapt-Vupt)
+            const chats = await client.getChats();
 
-                mensagensRecebidas = [];
-                contatosSalvos = [];
+            // Cria lista inicial rápida (nomes e IDs) para não ter tela vazia
+            contatosSalvos = chats
+                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                .map(c => ({
+                    id: c.id._serialized,
+                    name: c.name || "Sem Nome",
+                    number: c.id.user,
+                    foto: null,
+                    lastMessageTimestamp: c.timestamp || 0,
+                    lastMessageText: "",
+                    lastMessageFromMe: false
+                }));
 
-                // Processa por blocos para ser leve
-                for (const chat of chats.slice(0, 60)) {
-                    if (!chat || chat.id._serialized.includes('@g.us')) continue;
+            // EMITE IMEDIATAMENTE - O painel lateral aparece cheio na hora!
+            io.emit('init_contacts', contatosSalvos);
 
+            // 3. TRABALHADOR DE BACKGROUND (Preenche fotos e mensagens gradualmente)
+            (async () => {
+                mensagensRecebidas = []; // Limpa histórico para nova carga
+                for (const c of contatosSalvos) {
                     try {
-                        const foto = await client.getProfilePicUrl(chat.id._serialized).catch(() => null);
-                        const lastMsgs = await chat.fetchMessages({ limit: 10 }).catch(() => []);
+                        const chatObj = await client.getChatById(c.id);
+                        const foto = await client.getProfilePicUrl(c.id).catch(() => null);
 
-                        for (const m of lastMsgs) {
-                            await processarMensagemSync(m, foto);
-                        }
+                        // Busca Histórico (20 msgs por contato para ser rápido)
+                        const msgs = await chatObj.fetchMessages({ limit: 20 }).catch(() => []);
 
-                        const resumo = {
-                            id: chat.id._serialized,
-                            name: chat.name || "Sem Nome",
-                            number: chat.id.user,
-                            foto: foto,
-                            lastMessageTimestamp: chat.timestamp || 0,
-                            lastMessageText: lastMsgs.length > 0 ? lastMsgs[lastMsgs.length - 1].body : "",
-                            lastMessageFromMe: lastMsgs.length > 0 ? lastMsgs[lastMsgs.length - 1].fromMe : false
-                        };
+                        const idx = contatosSalvos.findIndex(cs => cs.id === c.id);
+                        if (idx !== -1) {
+                            contatosSalvos[idx].foto = foto;
+                            if (msgs.length > 0) {
+                                contatosSalvos[idx].lastMessageText = msgs[msgs.length - 1].body;
+                                contatosSalvos[idx].lastMessageFromMe = msgs[msgs.length - 1].fromMe;
+                            }
 
-                        contatosSalvos.push(resumo);
+                            for (const m of msgs) {
+                                await processarMensagemSync(m, foto);
+                            }
 
-                        // Atualiza a cada 5 para fluidez
-                        if (contatosSalvos.length % 5 === 0) {
+                            // Emite atualização para manter o front vivo e fluido
                             io.emit('init_contacts', contatosSalvos);
                             io.emit('init_messages', mensagensRecebidas);
                         }
                     } catch (e) { }
                 }
+                console.log("✅ Sincronização de histórico finalizada.");
+            })();
 
-                io.emit('init_contacts', contatosSalvos);
-                io.emit('init_messages', mensagensRecebidas);
-                console.log("✅ Sincronização Concluída com sucesso.");
-            } catch (err) {
-                console.error("Erro no background sync:", err);
-            }
-        })();
+        } catch (err) {
+            console.error("Erro na carga progressiva:", err);
+        }
     });
 
     async function processarMensagemSync(msg, fotoUrl) {

@@ -128,48 +128,42 @@ function initWhatsApp() {
         qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
 
-        // Fase 1: Sincronização Instantânea (Chats Ativos)
+        // Fase 1: Sincronização Instantânea de Chats e Agenda
         try {
-            console.log("⚡ Fase 1: Sincronizando chats ativos...");
-            const chats = await client.getChats();
-            const syncChats = chats.slice(0, 40);
+            console.log("⚡ Sincronizando chats e contatos imediatamente...");
 
+            // Busca contatos (agenda) imediatamente
+            const contacts = await client.getContacts();
+            const simplifiedContacts = contacts
+                .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                .map(c => ({
+                    id: c.id._serialized,
+                    name: c.name || c.pushname || c.number || "Sem Nome",
+                    number: c.number || (c.id ? c.id.user : ""),
+                    foto: null
+                }));
+
+            contatosSalvos = simplifiedContacts;
+            io.emit('init_contacts', simplifiedContacts);
+            console.log(`✅ Agenda carregada: ${simplifiedContacts.length} contatos.`);
+
+            // Busca mensagens dos chats recentes
+            const chats = await client.getChats();
+            const syncChats = chats.slice(0, 30);
             const cacheFotos = {};
+
             for (const chat of syncChats) {
                 const peerId = chat.id._serialized;
                 if (peerId.includes('@g.us')) continue;
-                if (!cacheFotos[peerId]) {
-                    cacheFotos[peerId] = await client.getProfilePicUrl(peerId).catch(() => null);
-                }
-                const messages = await chat.fetchMessages({ limit: 3 });
+                const messages = await chat.fetchMessages({ limit: 2 });
                 for (const msg of messages) {
-                    await processarMensagemSync(msg, cacheFotos[peerId]);
+                    await processarMensagemSync(msg, null);
                 }
             }
             io.emit('init_messages', mensagensRecebidas);
-            console.log(`✅ Fase 1 concluída: ${mensagensRecebidas.length} msgs carregadas.`);
-        } catch (err) { console.error("Erro na Fase 1:", err); }
-
-        // Fase 2: Agenda Completa (Atrasada para estabilização)
-        console.log("⏳ Aguardando 10s para Fase 2 (Agenda)...");
-        setTimeout(async () => {
-            try {
-                console.log("🔄 Fase 2: Buscando agenda completa...");
-                const contacts = await client.getContacts();
-                const simplifiedContacts = contacts
-                    .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                    .map(c => ({
-                        id: c.id._serialized,
-                        name: c.name || c.pushname || c.number || "Sem Nome",
-                        number: c.number || (c.id ? c.id.user : ""),
-                        foto: null
-                    }));
-
-                console.log(`✅ Fase 2 concluída: ${simplifiedContacts.length} contatos da agenda.`);
-                contatosSalvos = simplifiedContacts;
-                io.emit('init_contacts', simplifiedContacts);
-            } catch (err) { console.error("Erro na Fase 2:", err); }
-        }, 10000);
+        } catch (err) {
+            console.error("Erro na sincronização inicial:", err);
+        }
     });
 
     async function processarMensagemSync(msg, fotoUrl) {

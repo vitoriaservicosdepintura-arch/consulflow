@@ -137,6 +137,7 @@ const WhatsAppAICenter = () => {
     const [isIASuggesting, setIsIASuggesting] = useState(false);
     const [presencas, setPresencas] = useState<Record<string, { isOnline: boolean, lastSeen: string | null }>>({});
     const [allContacts, setAllContacts] = useState<any[]>([]);
+    const [contactSearch, setContactSearch] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -174,17 +175,22 @@ const WhatsAppAICenter = () => {
             }
         });
 
-        return Object.values(acc).sort((a: any, b: any) => {
-            // Priorizar quem tem mensagens
-            if (a.messages.length > 0 && b.messages.length === 0) return -1;
-            if (a.messages.length === 0 && b.messages.length > 0) return 1;
-            // Depois por data da última mensagem
-            if (a.messages.length > 0 && b.messages.length > 0) {
-                return b.messages[0].timestamp - a.messages[0].timestamp;
-            }
-            // Por fim por nome
-            return a.name.localeCompare(b.name);
-        }) as any[];
+        return Object.values(acc)
+            .filter((c: any) => {
+                const q = contactSearch.toLowerCase();
+                return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
+            })
+            .sort((a: any, b: any) => {
+                // Se ambos têm mensagens, ordena pela mais recente
+                if (a.messages.length > 0 && b.messages.length > 0) {
+                    return b.messages[0].timestamp - a.messages[0].timestamp;
+                }
+                // Se apenas um tem, ele vai pro topo
+                if (a.messages.length > 0) return -1;
+                if (b.messages.length > 0) return 1;
+                // Se nenhum tem, ordem alfabética
+                return a.name.localeCompare(b.name);
+            }) as any[];
     })();
 
     // Sincroniza o contato ativo caso novas mensagens cheguem
@@ -398,7 +404,25 @@ const WhatsAppAICenter = () => {
                         <div className="flex flex-1 overflow-hidden">
                             {/* Contact List */}
                             <div className={`w-1/3 border-r border-border flex flex-col bg-slate-50/50 overscroll-contain ${activeContact ? 'hidden md:flex' : ''}`}>
-                                <div className="p-4 border-b bg-white italic font-bold text-xs flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /> Monitores Ativos</div>
+                                <div className="p-4 border-b bg-white flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="italic font-bold text-xs flex items-center gap-2">
+                                            <Zap className="w-4 h-4 text-amber-500" /> Monitores Ativos
+                                        </div>
+                                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-500">
+                                            {groupedContacts.length}
+                                        </span>
+                                    </div>
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                                        <input
+                                            className="w-full pl-7 pr-3 py-1.5 bg-slate-100 border-none rounded-lg text-[11px] focus:ring-1 focus:ring-emerald-500/30 outline-none"
+                                            placeholder="Buscar contato..."
+                                            value={contactSearch}
+                                            onChange={(e) => setContactSearch(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
                                 <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
                                     {groupedContacts.map((c: any) => (
                                         <div key={c.id} onClick={() => setActiveContact(c)} className={`p-4 cursor-pointer border-b transition-all flex gap-3 hover:bg-emerald-50 ${activeContact?.id === c.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}>

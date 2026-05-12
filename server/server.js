@@ -28,6 +28,7 @@ let isConnected = false;
 let mensagensRecebidas = [];
 let iaAtivaPorContato = {};
 let chatHistoryIA = {};
+let contatosSalvos = [];
 let client;
 
 async function getStatus() {
@@ -165,6 +166,7 @@ function initWhatsApp() {
                     }));
 
                 console.log(`✅ Fase 2 concluída: ${simplifiedContacts.length} contatos da agenda.`);
+                contatosSalvos = simplifiedContacts;
                 io.emit('init_contacts', simplifiedContacts);
             } catch (err) { console.error("Erro na Fase 2:", err); }
         }, 10000);
@@ -259,6 +261,7 @@ function initWhatsApp() {
 io.on('connection', async (socket) => {
     socket.emit('status_update', await getStatus());
     if (mensagensRecebidas.length > 0) socket.emit('init_messages', mensagensRecebidas);
+    if (contatosSalvos.length > 0) socket.emit('init_contacts', contatosSalvos);
 });
 
 app.get('/api/status', async (req, res) => res.json(await getStatus()));

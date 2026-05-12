@@ -72,7 +72,7 @@ function initWhatsApp() {
             if (!peerId || peerId.includes('@g.us')) return;
 
             const contato = await client.getContactById(peerId).catch(() => null);
-            const nome = contato?.name || contato?.pushname || peerId.replace('@c.us', '');
+            const nome = contato?.name || contato?.pushname || contato?.verifiedName || peerId.replace('@c.us', '');
 
             let fotoUrl = null;
             try {
@@ -106,7 +106,7 @@ function initWhatsApp() {
             if (index === -1) {
                 mensagensRecebidas.push(novaMsg);
                 mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
-                if (mensagensRecebidas.length > 2000) mensagensRecebidas.pop(); // Aumentado limite de cache
+                if (mensagensRecebidas.length > 2000) mensagensRecebidas.pop();
 
                 if (emitir) io.emit('nova_mensagem', novaMsg);
             }
@@ -142,7 +142,7 @@ function initWhatsApp() {
 
             console.log(`📂 Sincronizando apenas os ${recentChats.length} chats mais recentes...`);
 
-            // 3. Carga Ultra-Rápida de Resumo (nome já vem do chat)
+            // 3. Carga Ultra-Rápida de Resumo
             contatosSalvos = recentChats.map(c => ({
                 id: c.id._serialized,
                 name: c.name || "Sem Nome",
@@ -154,7 +154,7 @@ function initWhatsApp() {
                 lastMessageTime: new Date(c.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
             }));
 
-            // Destrava a tela IMEDIATAMENTE com os nomes
+            // Destrava a tela IMEDIATAMENTE com os nomes básicos
             io.emit('status_update', { status: 'conectado' });
             io.emit('init_contacts', contatosSalvos);
 
@@ -164,19 +164,14 @@ function initWhatsApp() {
                     const c = contatosSalvos[i];
                     try {
                         const chatObj = await client.getChatById(c.id);
-
-                        // Nome real via API de contatos
                         const contatoInfo = await client.getContactById(c.id).catch(() => null);
-                        const nomeReal = contatoInfo?.name || contatoInfo?.pushname || c.name || c.number;
-                        contatosSalvos[i].name = nomeReal;
-
-                        // Foto de perfil
+                        const nomeReal = contatoInfo?.name || contatoInfo?.pushname || contatoInfo?.verifiedName || c.name || c.number;
                         const foto = await client.getProfilePicUrl(c.id).catch(() => null);
+
+                        contatosSalvos[i].name = nomeReal;
                         contatosSalvos[i].foto = foto;
 
-                        // 30 mensagens de histórico com mídia completa
                         const msgs = await chatObj.fetchMessages({ limit: 30 }).catch(() => []);
-
                         if (msgs.length > 0) {
                             const last = msgs[msgs.length - 1];
                             contatosSalvos[i].lastMessageText = last.body || _tipoMensagem(last.type);
@@ -188,8 +183,6 @@ function initWhatsApp() {
                                 await processarMensagemSync(m, foto, nomeReal);
                             }
                         }
-
-                        // Envia atualização incremental do contato
                         io.emit('init_contacts', contatosSalvos);
                         io.emit('init_messages', mensagensRecebidas);
                     } catch (e) {
@@ -198,7 +191,6 @@ function initWhatsApp() {
                 }
                 console.log("✅ Sincronização completa com mídia concluída.");
             })();
-
         } catch (err) {
             console.error("Erro na sincronização:", err);
             io.emit('status_update', { status: 'conectado' });
@@ -222,9 +214,7 @@ function initWhatsApp() {
 
         const contatoExistente = contatosSalvos.find(c => c.id === peerId);
 
-        // SÓ processa mensagem se o contato for um dos RECENTES que já mapeamos
         if (contatoExistente) {
-            // Download de mídia completo: fotos, vídeos, áudios, docs, stickers
             let mediaData = null;
             const tiposMidia = ['image', 'video', 'audio', 'ptt', 'document', 'sticker'];
             if (msg.hasMedia && tiposMidia.includes(msg.type)) {
@@ -237,7 +227,7 @@ function initWhatsApp() {
                             filename: media.filename || null
                         };
                     }
-                } catch (e) { /* ignora erros de download */ }
+                } catch (e) { }
             }
 
             const textoExibivel = msg.body || (msg.hasMedia ? _tipoMensagem(msg.type) : '');
@@ -265,10 +255,8 @@ function initWhatsApp() {
 
     client.on('presence_update', async (presence) => {
         const id_raw = presence.id._serialized;
-        const type = presence.type; // 'online', 'offline', 'typing', 'recording'
+        const type = presence.type;
         const isOnline = type === 'online';
-
-        console.log(`[Presence] Atualização capturada para ${id_raw}: ${type}`);
 
         let lastSeenFormatted = null;
         if (type === 'offline') {
@@ -302,7 +290,7 @@ function initWhatsApp() {
             console.error('ERRO Puppeteer:', err.message);
             io.emit('status_update', { status: 'erro', mensagem: err.message });
         });
-    }, 8000); // Delay maior para evitar conflitos de sessão
+    }, 8000);
 }
 
 io.on('connection', async (socket) => {
@@ -344,23 +332,16 @@ app.post('/api/enviar', async (req, res) => {
 
 app.post('/api/desconectar', async (req, res) => {
     try {
-        console.log("♻️ Solicitando desconexão profunda...");
-
-        // Resposta imediata para o frontend não travar
         res.json({ ok: true });
-
         isConnected = false;
         qrCodeData = '';
         mensagensRecebidas = [];
-        contatosSalvos = []; // Limpa a agenda ao desconectar
-
+        contatosSalvos = [];
         io.emit('status_update', { status: 'iniciando' });
         io.emit('init_messages', []);
         io.emit('init_contacts', []);
 
         if (client) {
-            console.log("🛑 Finalizando cliente WhatsApp...");
-            // Tenta logout e destroy, mas não espera eternamente (catch resolve rápido)
             await Promise.race([
                 client.logout().catch(() => { }),
                 new Promise(resolve => setTimeout(resolve, 3000))
@@ -370,68 +351,44 @@ app.post('/api/desconectar', async (req, res) => {
 
         const authPath = path.join(__dirname, '.wwebjs_auth');
         if (fs.existsSync(authPath)) {
-            console.log("📂 Removendo pasta de autenticação...");
-            try {
-                // Pequeno delay para garantir que o Chrome soltou os arquivos
-                setTimeout(() => {
-                    fs.rmSync(authPath, { recursive: true, force: true });
-                    console.log("✅ Limpeza de cache concluída. Reiniciando...");
-                    initWhatsApp();
-                }, 1000);
-            } catch (err) {
-                console.error("Erro ao remover pasta auth:", err.message);
-                initWhatsApp(); // Reinicia mesmo se falhar a limpeza
-            }
+            setTimeout(() => {
+                fs.rmSync(authPath, { recursive: true, force: true });
+                initWhatsApp();
+            }, 1000);
         } else {
             initWhatsApp();
         }
-
     } catch (e) {
         console.error("Erro na rota de desconexão:", e);
         if (!res.headersSent) res.status(500).send();
     }
 });
 
-// Rota de reset nuclear - limpa TODO o cache de sessão
 app.post('/api/reset-session', async (req, res) => {
     try {
-        console.log("💣 Reset nuclear solicitado...");
         res.json({ ok: true, msg: 'Reset iniciado' });
-
         isConnected = false;
         qrCodeData = '';
         mensagensRecebidas = [];
         contatosSalvos = [];
-
         io.emit('status_update', { status: 'iniciando' });
         io.emit('init_messages', []);
         io.emit('init_contacts', []);
 
-        // Destroi o cliente sem tentar logout (evita trava)
         if (client) {
             await client.destroy().catch(() => { });
         }
 
-        // Aguarda o Chrome soltar os arquivos
         await new Promise(r => setTimeout(r, 3000));
-
-        // Remove TUDO: pasta de auth e cache do wwebjs
         const authPath = path.join(__dirname, '.wwebjs_auth');
         const cachePath = path.join(__dirname, '.wwebjs_cache');
         [authPath, cachePath].forEach(p => {
-            if (fs.existsSync(p)) {
-                fs.rmSync(p, { recursive: true, force: true });
-                console.log(`✅ Removido: ${p}`);
-            }
+            if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
         });
-
-        console.log("🚀 Reiniciando com sessão limpa...");
         setTimeout(() => initWhatsApp(), 2000);
-
-    } catch (e) {
-        console.error("Erro no reset:", e);
-    }
+    } catch (e) { }
 });
+
 app.options('*', cors());
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -442,6 +399,6 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`🚀 Server Multimedia na ${PORT}`); // Ajustado para bater com os logs do usuário
+    console.log(`🚀 Server Multimedia na ${PORT}`);
     initWhatsApp();
 });

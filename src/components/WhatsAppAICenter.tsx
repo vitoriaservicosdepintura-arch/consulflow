@@ -152,7 +152,8 @@ const WhatsAppAICenter = () => {
                     id: c.id,
                     number: c.number,
                     rawId: c.id,
-                    name: c.name,
+                    name: c.name || "Sem Nome",
+
                     photo: c.foto,
                     lastMessageTimestamp: c.lastMessageTimestamp || 0,
                     lastMessageTime: c.lastMessageTime || "",
@@ -432,8 +433,10 @@ const WhatsAppAICenter = () => {
                                                 ) : profilePics[c.id] && profilePics[c.id] !== 'none' ? (
                                                     <img src={profilePics[c.id]} alt="PI" className="w-full h-full object-cover" />
                                                 ) : (
-                                                    c.name.charAt(0).toUpperCase()
+                                                    (c.name || "?").charAt(0).toUpperCase()
                                                 )}
+
+
                                                 {/* Bolinha Verde Online */}
                                                 {presencas[c.id]?.isOnline && (
                                                     <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
@@ -472,8 +475,10 @@ const WhatsAppAICenter = () => {
                                                     {profilePics[activeContact.id] && profilePics[activeContact.id] !== 'none' ? (
                                                         <img src={profilePics[activeContact.id]} alt="Profile" className="w-full h-full object-cover" />
                                                     ) : (
-                                                        activeContact.name.charAt(0).toUpperCase()
+                                                        (activeContact.name || "?").charAt(0).toUpperCase()
                                                     )}
+
+
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm">{activeContact.name}</h3>

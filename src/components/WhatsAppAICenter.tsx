@@ -461,11 +461,11 @@ const WhatsAppAICenter = () => {
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-1">
-                                                    {c.messages.length > 0 && c.messages[0].fromMe && (
+                                                    {(c.lastMessageFromMe || (c.messages.length > 0 && c.messages[0].fromMe)) && (
                                                         <CheckCheck className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                                                     )}
                                                     <p className="text-[12px] text-slate-500 truncate leading-snug">
-                                                        {c.messages.length > 0 ? c.messages[0].texto : "Sem conversas recentes"}
+                                                        {c.lastMessageText || (c.messages.length > 0 ? c.messages[0].texto : "Sem conversas recentes")}
                                                     </p>
                                                 </div>
                                             </div>

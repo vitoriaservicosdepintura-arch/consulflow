@@ -129,65 +129,70 @@ function initWhatsApp() {
         io.emit('status_update', { status: 'conectado' });
 
         try {
-            console.log("⚡ Sincronização Incremental Iniciada...");
+            console.log("⚡ Sincronização FLASH MASTER Iniciada...");
 
-            // 1. Busca a lista de chats (instantâneo)
             const chats = await client.getChats();
-            console.log(`📂 ${chats.length} conversas encontradas.`);
+            console.log(`📂 Processando ${chats.length} conversas...`);
 
-            // Limpa mensagens para carga inicial
+            // Limpa mensagens locais
             mensagensRecebidas = [];
 
-            // Mapeamento básico para UI não ficar vazia
-            const initialContacts = chats.slice(0, 80)
-                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                .map(c => ({
-                    id: c.id._serialized,
-                    name: c.name || "Sem Nome",
-                    number: c.id.user,
-                    foto: null,
-                    lastMessageTimestamp: c.timestamp || 0
-                }));
+            // CARGA FLASH: Processa os 60 chats mais recentes com resumo imediato
+            const enrichedChats = await Promise.all(chats.slice(0, 60).map(async (chat) => {
+                const peerId = chat.id._serialized;
+                if (!peerId || peerId.includes('@g.us')) return null;
 
-            contatosSalvos = initialContacts;
-            io.emit('init_contacts', initialContacts); // ENVIADO IMEDIATAMENTE
+                try {
+                    const foto = await client.getProfilePicUrl(peerId).catch(() => null);
+                    // Pega apenas a ULTIMA mensagem para o resumo inicial (muito rápido)
+                    const lastMsgs = await chat.fetchMessages({ limit: 1 }).catch(() => []);
+                    const lastMsg = lastMsgs[0];
 
-            // 2. Popula dados pesados em background de forma controlada
-            for (const cShort of initialContacts) {
+                    if (lastMsg) {
+                        await processarMensagemSync(lastMsg, foto);
+                    }
+
+                    return {
+                        id: peerId,
+                        name: chat.name || "Sem Nome",
+                        number: peerId.split('@')[0],
+                        foto: foto,
+                        lastMessageTimestamp: chat.timestamp || 0,
+                        lastMessageText: lastMsg ? lastMsg.body : "",
+                        lastMessageFromMe: lastMsg ? lastMsg.fromMe : false
+                    };
+                } catch (e) {
+                    return { id: peerId, name: chat.name || "Sem Nome", number: peerId.split('@')[0], foto: null, lastMessageTimestamp: chat.timestamp || 0 };
+                }
+            }));
+
+            const finalInitialList = enrichedChats.filter(c => c !== null);
+            contatosSalvos = finalInitialList;
+
+            // Envia TUDO pronto pro front em 1 segundo
+            io.emit('init_contacts', finalInitialList);
+            io.emit('init_messages', mensagensRecebidas);
+
+            // CARGA PROFUNDA: Busca o resto do histórico sem pressa
+            for (const cShort of finalInitialList) {
                 (async () => {
                     try {
                         const chat = await client.getChatById(cShort.id);
-                        const foto = await client.getProfilePicUrl(cShort.id).catch(() => null);
-
-                        // Atualiza foto no cache
-                        const idx = contatosSalvos.findIndex(cs => cs.id === cShort.id);
-                        if (idx !== -1) {
-                            contatosSalvos[idx].foto = foto;
-                            io.emit('init_contacts', contatosSalvos);
-                        }
-
-                        // Busca histórico real
-                        const messages = await chat.fetchMessages({ limit: 15 });
+                        const messages = await chat.fetchMessages({ limit: 20 });
                         for (const msg of messages) {
-                            await processarMensagemSync(msg, foto);
+                            await processarMensagemSync(msg, cShort.foto);
                         }
                         io.emit('init_messages', mensagensRecebidas);
                     } catch (e) { }
                 })();
             }
 
-            // 3. Busca agenda completa no fim
+            // Agenda passiva
             const contacts = await client.getContacts().catch(() => []);
             contacts.forEach(c => {
                 if (c && c.id && !c.id._serialized.includes('@g.us')) {
                     if (!contatosSalvos.find(cs => cs.id === c.id._serialized)) {
-                        contatosSalvos.push({
-                            id: c.id._serialized,
-                            name: c.name || c.pushname || "Sem Nome",
-                            number: c.id.user,
-                            foto: null,
-                            lastMessageTimestamp: 0
-                        });
+                        contatosSalvos.push({ id: c.id._serialized, name: c.name || "Sem Nome", number: c.id.user, foto: null, lastMessageTimestamp: 0 });
                     }
                 }
             });

@@ -164,19 +164,40 @@ const WhatsAppAICenter = () => {
             }
         });
 
-        // 2. ADICIONAMOS MENSAGENS APENAS SE O CONTATO ESTIVER NA LISTA ACIMA
+        // 2. ADICIONAMOS MENSAGENS E CRIAMOS CONTATOS VIRTUAIS SE NÃO EXISTIREM
         realMessages.forEach((msg: any) => {
             const key = msg.de_raw || msg.de;
-            if (key !== 'me' && acc[key]) {
-                acc[key].messages.push(msg);
-                // Atualiza o texto da última mensagem se for mais recente que o atual
-                if (msg.timestamp * 1000 > acc[key].lastMessageTimestamp) {
-                    acc[key].lastMessageText = msg.texto;
-                    acc[key].lastMessageFromMe = msg.fromMe;
-                    acc[key].lastMessageTime = msg.horario;
-                }
+            if (key === 'me' || !key) return;
+
+            // Se o contato não veio na carga inicial de 50, criamos ele aqui "on-the-fly"
+            if (!acc[key]) {
+                acc[key] = {
+                    id: key,
+                    number: key.split('@')[0],
+                    rawId: key,
+                    name: msg.nome || "Novo Contato",
+                    photo: msg.foto || null,
+                    lastMessageTimestamp: msg.timestamp * 1000,
+                    lastMessageTime: msg.horario,
+                    lastMessageText: msg.texto,
+                    lastMessageFromMe: msg.fromMe,
+                    messages: []
+                };
+            }
+
+            acc[key].messages.push(msg);
+
+            // Atualiza o resumo se esta msg for a mais recente
+            if (msg.timestamp * 1000 >= (acc[key].lastMessageTimestamp || 0)) {
+                acc[key].lastMessageText = msg.texto;
+                acc[key].lastMessageFromMe = msg.fromMe;
+                acc[key].lastMessageTime = msg.horario;
+                acc[key].lastMessageTimestamp = msg.timestamp * 1000;
+                if (msg.nome && acc[key].name === "Novo Contato") acc[key].name = msg.nome;
+                if (msg.foto && !acc[key].photo) acc[key].photo = msg.foto;
             }
         });
+
 
         return Object.values(acc)
             .filter((c: any) => {

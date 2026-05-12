@@ -123,17 +123,22 @@ function initWhatsApp() {
     });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp CONECTADO - Apenas Chats Recentes');
+        console.log('✅ WhatsApp CONECTADO - Pronto para interagir');
         isConnected = true;
         qrCodeData = '';
 
-        // 1. Limpa tudo para garantir que não tenha lixo da agenda anterior
+        // Emite status IMEDIATAMENTE para liberar o frontend
+        io.emit('status_update', { status: 'conectado' });
+
+        // 1. Limpa lixo anterior
         contatosSalvos = [];
         mensagensRecebidas = [];
 
         try {
-            // 2. Busca APENAS os chats (Conversas Ativas)
+            console.log("📂 Iniciando busca de chats (getChats)...");
+            const start = Date.now();
             const allChats = await client.getChats();
+            console.log(`📂 Busca concluída em ${((Date.now() - start) / 1000).toFixed(1)}s. Total: ${allChats.length}`);
 
             // Filtramos apenas os 50 mais RECENTES e que não sejam grupos
             const recentChats = allChats
@@ -253,6 +258,57 @@ function initWhatsApp() {
         }
     }
 
+    // --- MOTOR DE IA (GROQ / OPENAI) ---
+    async function gerarRespostaIA(peerId, textoMensagem) {
+        try {
+            if (!iaAtivaPorContato[peerId]) return;
+
+            // Mantém mini-histórico para contexto (últimas 6 msgs)
+            if (!chatHistoryIA[peerId]) chatHistoryIA[peerId] = [];
+            chatHistoryIA[peerId].push({ role: 'user', content: textoMensagem });
+            if (chatHistoryIA[peerId].length > 6) chatHistoryIA[peerId].shift();
+
+            console.log(`🤖 IA pensando para ${peerId}...`);
+
+            // Aqui você deve colocar sua chave no .env: GROQ_API_KEY
+            const apiKey = process.env.GROQ_API_KEY;
+
+            if (!apiKey) {
+                console.log("⚠️ GROQ_API_KEY não configurada. Usando resposta simulada.");
+                const respostaSimulada = "Olá! Esta é uma resposta automática inteligente (Modo Simulação). Para ativar a IA real, configure a GROQ_API_KEY no seu servidor.";
+
+                // Envia como sugestão primeiro
+                io.emit('ia_sugestao', { id_raw: peerId, sugestao: respostaSimulada });
+
+                // Se quiser que responda SOZINHO (Auto-reply), descomente abaixo:
+                // await client.sendMessage(peerId, respostaSimulada);
+                return;
+            }
+
+            const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+                model: "llama-3.1-70b-versatile",
+                messages: [
+                    { role: "system", content: "Você é um assistente comercial inteligente do Consuflow. Seja cordial, direto e ajude o cliente com suas dúvidas sobre serviços de pintura e consultoria. Use emojis moderadamente." },
+                    ...chatHistoryIA[peerId]
+                ]
+            }, {
+                headers: { 'Authorization': `Bearer ${apiKey}` }
+            });
+
+            const respostaFinal = response.data.choices[0].message.content;
+            chatHistoryIA[peerId].push({ role: 'assistant', content: respostaFinal });
+
+            // Emite a sugestão para o painel do usuário ver (Tempo Real)
+            io.emit('ia_sugestao', { id_raw: peerId, sugestao: respostaFinal });
+
+            // Auto-reply: Se estiver ativo, ele envia direto
+            // await client.sendMessage(peerId, respostaFinal);
+
+        } catch (err) {
+            console.error("Erro na IA:", err.message);
+        }
+    }
+
     client.on('presence_update', async (presence) => {
         const id_raw = presence.id._serialized;
         const type = presence.type;
@@ -282,7 +338,16 @@ function initWhatsApp() {
     });
 
     client.on('message_create', async (msg) => {
+        // Processa para a lista e interface
         await processarMensagem(msg, true);
+
+        // Se for mensagem recebida (não minha), tenta disparar IA
+        if (!msg.fromMe) {
+            const peerId = msg.from;
+            if (iaAtivaPorContato[peerId]) {
+                await gerarRespostaIA(peerId, msg.body);
+            }
+        }
     });
 
     setTimeout(() => {
@@ -295,9 +360,11 @@ function initWhatsApp() {
 
 io.on('connection', async (socket) => {
     socket.emit('status_update', await getStatus());
-    if (mensagensRecebidas.length > 0) socket.emit('init_messages', mensagensRecebidas);
+    // Garante que o frontend receba o cache atual IMEDIATAMENTE ao conectar
     if (contatosSalvos.length > 0) socket.emit('init_contacts', contatosSalvos);
+    if (mensagensRecebidas.length > 0) socket.emit('init_messages', mensagensRecebidas);
 });
+
 
 app.get('/api/status', async (req, res) => res.json(await getStatus()));
 app.get('/api/mensagens', (req, res) => res.json(mensagensRecebidas));

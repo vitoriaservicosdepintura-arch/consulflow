@@ -90,7 +90,13 @@ function initWhatsApp() {
                 '--no-zygote',
                 '--disable-gpu',
                 '--proxy-server="direct://"',
-                '--proxy-bypass-list=*'
+                '--proxy-bypass-list=*',
+                '--disable-extensions',
+                '--disable-default-apps',
+                '--hidescrollbars',
+                '--disable-notifications',
+                '--disable-background-networking',
+                '--disable-background-timer-throttling'
             ]
         },
         authTimeoutMs: 60000,

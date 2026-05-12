@@ -109,6 +109,7 @@ function initWhatsApp() {
                 if (mensagensRecebidas.length > 2000) mensagensRecebidas.pop();
 
                 if (emitir) io.emit('nova_mensagem', novaMsg);
+                console.log(`📩 [SOCKET] Nova mensagem emitida: ${novaMsg.id} de ${novaMsg.nome}`);
             }
         } catch (err) {
             console.error("Erro ao processar mensagem:", err.message);
@@ -140,17 +141,17 @@ function initWhatsApp() {
             const allChats = await client.getChats();
             console.log(`📂 Busca concluída em ${((Date.now() - start) / 1000).toFixed(1)}s. Total: ${allChats.length}`);
 
-            // Filtramos apenas os 50 mais RECENTES e que não sejam grupos
+            // Filtramos apenas os 100 mais RECENTES e que não sejam grupos
             const recentChats = allChats
                 .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                .slice(0, 50);
+                .slice(0, 100);
 
-            console.log(`📂 Sincronizando apenas os ${recentChats.length} chats mais recentes...`);
+            console.log(`📂 Sincronizando os ${recentChats.length} chats mais recentes...`);
 
-            // 3. Carga Ultra-Rápida de Resumo
+            // 3. Carga Rápida Inicial (Apenas o que já temos no chat object)
             contatosSalvos = recentChats.map(c => ({
                 id: c.id._serialized,
-                name: c.name || "Sem Nome",
+                name: c.name || c.id.user,
                 number: c.id.user,
                 foto: null,
                 lastMessageTimestamp: c.timestamp * 1000,
@@ -159,43 +160,55 @@ function initWhatsApp() {
                 lastMessageTime: new Date(c.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
             }));
 
-            // Destrava a tela IMEDIATAMENTE com os nomes básicos
-            io.emit('status_update', { status: 'conectado' });
+            // Destrava a tela IMEDIATAMENTE
             io.emit('init_contacts', contatosSalvos);
 
-            // 4. Preenchimento de Detalhes em Background (nome real, foto, histórico com mídia)
-            (async () => {
-                for (let i = 0; i < contatosSalvos.length; i++) {
-                    const c = contatosSalvos[i];
+            // 4. Processamento em Lotes (Paralelo controlado para não travar o Puppeteer)
+            const processBatch = async (batch) => {
+                await Promise.all(batch.map(async (c) => {
                     try {
                         const chatObj = await client.getChatById(c.id);
-                        const contatoInfo = await client.getContactById(c.id).catch(() => null);
-                        const nomeReal = contatoInfo?.name || contatoInfo?.pushname || contatoInfo?.verifiedName || c.name || c.number;
-                        const foto = await client.getProfilePicUrl(c.id).catch(() => null);
+                        const contactObj = await client.getContactById(c.id).catch(() => null);
 
-                        contatosSalvos[i].name = nomeReal;
-                        contatosSalvos[i].foto = foto;
+                        const idx = contatosSalvos.findIndex(ct => ct.id === c.id);
+                        if (idx !== -1) {
+                            const nomeReal = contactObj?.name || contactObj?.pushname || contactObj?.verifiedName || chatObj.name || c.number;
+                            const foto = await client.getProfilePicUrl(c.id).catch(() => null);
 
-                        const msgs = await chatObj.fetchMessages({ limit: 30 }).catch(() => []);
-                        if (msgs.length > 0) {
-                            const last = msgs[msgs.length - 1];
-                            contatosSalvos[i].lastMessageText = last.body || _tipoMensagem(last.type);
-                            contatosSalvos[i].lastMessageFromMe = last.fromMe;
-                            contatosSalvos[i].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                            contatosSalvos[i].lastMessageTimestamp = last.timestamp * 1000;
+                            contatosSalvos[idx].name = nomeReal;
+                            contatosSalvos[idx].foto = foto;
 
-                            for (const m of msgs) {
-                                await processarMensagemSync(m, foto, nomeReal);
+                            const msgs = await chatObj.fetchMessages({ limit: 40 }).catch(() => []);
+                            if (msgs.length > 0) {
+                                const last = msgs[msgs.length - 1];
+                                contatosSalvos[idx].lastMessageText = last.body || _tipoMensagem(last.type);
+                                contatosSalvos[idx].lastMessageFromMe = last.fromMe;
+                                contatosSalvos[idx].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                contatosSalvos[idx].lastMessageTimestamp = last.timestamp * 1000;
+
+                                for (const m of msgs) {
+                                    await processarMensagemSync(m, foto, nomeReal);
+                                }
                             }
+                            // Emite atualização do contato individualmente se quiser, 
+                            // ou emite a lista completa a cada batch
                         }
-                        io.emit('init_contacts', contatosSalvos);
-                        io.emit('init_messages', mensagensRecebidas);
                     } catch (e) {
-                        console.error(`Erro contato ${c.id}:`, e.message);
+                        console.error(`Erro no contato ${c.id}:`, e.message);
                     }
-                }
-                console.log("✅ Sincronização completa com mídia concluída.");
-            })();
+                }));
+            };
+
+            // Divide em lotes de 10 para performance
+            const batchSize = 10;
+            for (let i = 0; i < recentChats.length; i += batchSize) {
+                const batch = recentChats.slice(i, i + batchSize);
+                await processBatch(batch);
+                io.emit('init_contacts', contatosSalvos);
+                io.emit('init_messages', mensagensRecebidas);
+            }
+
+            console.log("✅ Sincronização completa concluída.");
         } catch (err) {
             console.error("Erro na sincronização:", err);
             io.emit('status_update', { status: 'conectado' });
@@ -394,7 +407,30 @@ app.get('/api/presenca', async (req, res) => {
 });
 
 app.post('/api/enviar', async (req, res) => {
-    try { await client.sendMessage(req.body.de_raw, req.body.mensagem); res.json({ ok: true }); } catch (e) { res.status(500).send(); }
+    try {
+        const msg = await client.sendMessage(req.body.de_raw, req.body.mensagem);
+        // Opcional: Processa a mensagem enviada imediatamente para o cache
+        await processarMensagem(msg, true);
+        res.json({ ok: true });
+    } catch (e) {
+        console.error("Erro ao enviar mensagem:", e);
+        res.status(500).send();
+    }
+});
+
+app.post('/api/enviar-midia', async (req, res) => {
+    try {
+        const { de_raw, base64data, mimetype, filename } = req.body;
+        // O base64 vem tipicamente como "data:image/png;base64,iVBORw..."
+        const base64Clean = base64data.split(',')[1] || base64data;
+        const media = new MessageMedia(mimetype, base64Clean, filename);
+        const msg = await client.sendMessage(de_raw, media);
+        await processarMensagem(msg, true);
+        res.json({ ok: true });
+    } catch (e) {
+        console.error("Erro ao enviar mídia:", e);
+        res.status(500).send();
+    }
 });
 
 app.post('/api/desconectar', async (req, res) => {

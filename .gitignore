@@ -31,3 +31,7 @@ server/.wwebjs_cache
 .vercel
 .env
 server/.env
+server/logs.txt
+server/err.txt
+err.txt
+logs.txt

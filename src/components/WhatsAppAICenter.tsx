@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { io } from "socket.io-client";
 import {
     MessageSquare,
@@ -143,20 +143,19 @@ const WhatsAppAICenter = () => {
 
 
     // Agrupar mensagens por contato e mesclar com a agenda completa
-    const groupedContacts = (() => {
-        // 1. COMEÇAMOS APENAS COM OS 50 RECENTES AUTORIZADOS PELO SERVIDOR
-        const acc: any = {};
+    const groupedContacts = useMemo(() => {
+        // 1. COMEÇAMOS APENAS COM OS CONTATOS ENVIADOS PELO SERVIDOR
+        const acc: Record<string, any> = {};
         allContacts.forEach(c => {
             if (c && c.id) {
                 acc[c.id] = {
                     id: c.id,
                     number: c.number,
                     rawId: c.id,
-                    name: c.name || "Sem Nome",
-
+                    name: c.name || c.number || "Sem Nome",
                     photo: c.foto,
                     lastMessageTimestamp: c.lastMessageTimestamp || 0,
-                    lastMessageTime: c.lastMessageTime || "",
+                    lastMessageTime: (c.lastMessageTime && c.lastMessageTime !== "00:00") ? c.lastMessageTime : "",
                     lastMessageText: c.lastMessageText || "",
                     lastMessageFromMe: c.lastMessageFromMe || false,
                     messages: []
@@ -164,18 +163,18 @@ const WhatsAppAICenter = () => {
             }
         });
 
-        // 2. ADICIONAMOS MENSAGENS E CRIAMOS CONTATOS VIRTUAIS SE NÃO EXISTIREM
+        // 2. ADICIONAMOS MENSAGENS E ATUALIZAMOS OS DADOS DOS CONTATOS
         realMessages.forEach((msg: any) => {
             const key = msg.de_raw || msg.de;
             if (key === 'me' || !key) return;
 
-            // Se o contato não veio na carga inicial de 50, criamos ele aqui "on-the-fly"
+            // Se o contato não veio na carga inicial, criamos ele
             if (!acc[key]) {
                 acc[key] = {
                     id: key,
                     number: key.split('@')[0],
                     rawId: key,
-                    name: msg.nome || "Novo Contato",
+                    name: msg.nome || key.split('@')[0],
                     photo: msg.foto || null,
                     lastMessageTimestamp: msg.timestamp * 1000,
                     lastMessageTime: msg.horario,
@@ -193,11 +192,17 @@ const WhatsAppAICenter = () => {
                 acc[key].lastMessageFromMe = msg.fromMe;
                 acc[key].lastMessageTime = msg.horario;
                 acc[key].lastMessageTimestamp = msg.timestamp * 1000;
-                if (msg.nome && acc[key].name === "Novo Contato") acc[key].name = msg.nome;
+                if (msg.nome && (acc[key].name === acc[key].number || acc[key].name === "Sem Nome")) {
+                    acc[key].name = msg.nome;
+                }
                 if (msg.foto && !acc[key].photo) acc[key].photo = msg.foto;
             }
         });
 
+        // Ordenamos as mensagens dentro de cada contato
+        Object.values(acc).forEach((c: any) => {
+            c.messages.sort((a: any, b: any) => (a.timestamp || 0) - (b.timestamp || 0));
+        });
 
         return Object.values(acc)
             .filter((c: any) => {
@@ -205,15 +210,17 @@ const WhatsAppAICenter = () => {
                 return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
             })
             .sort((a: any, b: any) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0)) as any[];
-    })();
+    }, [allContacts, realMessages, contactSearch]);
 
-    // Sincroniza o contato ativo caso novas mensagens cheguem
+    // Sincroniza o contato ativo caso novas mensagens cheguem (via ID)
     useEffect(() => {
         if (activeContact) {
             const updated = groupedContacts.find(c => c.id === activeContact.id);
-            if (updated) setActiveContact(updated);
+            if (updated && updated.messages.length !== activeContact.messages.length) {
+                setActiveContact(updated);
+            }
         }
-    }, [realMessages.length]);
+    }, [groupedContacts, activeContact?.id]);
 
     // Socket Connection
     useEffect(() => {

@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-    Wand2, Layout, Speaker, Image as ImageIcon, BarChart3, Palette,
+    Wand2, Layout, Megaphone, Image as ImageIcon, BarChart3, Palette,
     Settings, Bolt, Plus, Download, Bookmark, Share2, Clock,
-    Type, CloudUpload, Sparkles, LayoutKanban, World,
-    Check, Facebook, Instagram, Linkedin, Globe, Phone, Mail, UserPlus2, RefreshCw, Lightbulb
+    Type, CloudUpload, Sparkles, Kanban,
+    Check, Facebook, Instagram, Linkedin, Globe, Phone, Mail, UserPlus, RefreshCw, Lightbulb
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -145,7 +145,7 @@ const MarketingStudio = () => {
                         onClick={() => setCurrentView('ads')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${currentView === 'ads' ? 'bg-[#C9A84C]/10 text-[#C9A84C]' : 'text-[#B8B0A0] hover:bg-white/5'}`}
                     >
-                        <Speaker className="w-4 h-4" /> Anúncios
+                        <Megaphone className="w-4 h-4" /> Anúncios
                     </button>
                     <button
                         onClick={() => setCurrentView('gallery')}
@@ -331,7 +331,7 @@ const MarketingStudio = () => {
                                 <div className="bg-[#161616] border border-white/5 rounded-3xl p-6 shadow-xl">
                                     <div className="flex items-center justify-between mb-6">
                                         <div className="text-[10px] font-bold uppercase tracking-widest text-[#B8B0A0] flex items-center gap-2">
-                                            <LayoutKanban className="w-4 h-4 text-[#C9A84C]" /> Estrutura de Slides
+                                            <Kanban className="w-4 h-4 text-[#C9A84C]" /> Estrutura de Slides
                                         </div>
                                         <button className="px-3 py-1.5 bg-white/5 rounded-lg text-[10px] font-bold text-[#C9A84C] hover:bg-white/10 transition-all">+ Novo Slide</button>
                                     </div>
@@ -401,7 +401,7 @@ const MarketingStudio = () => {
                                         <div className="w-8 h-8 bg-[#C9A84C] rounded-full flex items-center justify-center text-[#0D0D0D] font-bold text-xs shadow-lg">JC</div>
                                         <div>
                                             <div className="text-[11px] font-bold text-white">João Consultor</div>
-                                            <div className="text-[9px] text-[#7A7060] flex items-center gap-1">Patrocinado <World className="w-2 h-2" /></div>
+                                            <div className="text-[9px] text-[#7A7060] flex items-center gap-1">Patrocinado <Globe className="w-2 h-2" /></div>
                                         </div>
                                     </div>
                                     <div className="aspect-square bg-gradient-to-br from-[#1a1200] to-[#2d2000] p-10 flex flex-col items-center justify-center text-center">

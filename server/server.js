@@ -128,47 +128,50 @@ function initWhatsApp() {
         qrCodeData = '';
         io.emit('status_update', { status: 'conectado' });
 
-        // Sincronização Profunda e Imediata
+        // Sincronização MASTER (Fiel ao WhatsApp Web)
         try {
-            console.log("⚡ Sincronização Profunda Iniciada...");
+            console.log("⚡ Sincronização MASTER Iniciada...");
 
-            // 1. Chats Ativos com Histórico e Fotos
+            // 1. Busca os CHATS ativos (é isso que define a ordem no Zap)
             const chats = await client.getChats();
-            const activeChats = chats.slice(0, 50); // Pega os 50 mais recentes
+            console.log(`📂 Processando ${chats.length} conversas...`);
 
-            console.log(`📂 Carregando histórico de ${activeChats.length} conversas...`);
+            // Limpa mensagens para não duplicar na carga inicial
+            mensagensRecebidas = [];
 
-            // Processa fotos de perfil em paralelo para ser rápido
-            const profilePicPromises = activeChats.map(chat =>
-                client.getProfilePicUrl(chat.id._serialized).catch(() => null)
-            );
-            const profilePics = await Promise.all(profilePicPromises);
-
-            for (let i = 0; i < activeChats.length; i++) {
-                const chat = activeChats[i];
-                const foto = profilePics[i];
+            // Pega fotos e mensagens em paralelo para os 60 mais recentes
+            const activeChatsProcessed = await Promise.all(chats.slice(0, 60).map(async (chat) => {
                 const peerId = chat.id._serialized;
+                if (!peerId || peerId.includes('@g.us')) return null;
 
-                if (peerId.includes('@g.us')) continue;
+                const foto = await client.getProfilePicUrl(peerId).catch(() => null);
 
-                // Carrega até 20 mensagens por conversa para ter histórico real
+                // Busca histórico real (últimas 20 mensagens)
                 const messages = await chat.fetchMessages({ limit: 20 });
                 for (const msg of messages) {
                     await processarMensagemSync(msg, foto);
                 }
-            }
+
+                return {
+                    id: peerId,
+                    name: chat.name || "Sem Nome",
+                    number: peerId.split('@')[0],
+                    foto: foto,
+                    lastMessageTimestamp: chat.timestamp || 0
+                };
+            }));
+
+            const validChats = activeChatsProcessed.filter(c => c !== null);
+            contatosSalvos = validChats;
 
             io.emit('init_messages', mensagensRecebidas);
-            console.log(`✅ Histórico carregado. Total: ${mensagensRecebidas.length} mensagens.`);
+            io.emit('init_contacts', validChats);
 
-            // 2. Agenda Completa em segundo plano (sem travar)
-            console.log("🔄 Mapeando agenda completa...");
-            const contacts = await client.getContacts().catch(err => {
-                console.error("❌ Erro ao buscar contatos:", err.message);
-                return [];
-            });
+            console.log(`✅ Sincronização concluída: ${validChats.length} conversas organizadas.`);
 
-            const simplifiedContacts = contacts
+            // 2. Agenda completa (em background para contatos sem chat aberto)
+            const contacts = await client.getContacts().catch(() => []);
+            const agenda = contacts
                 .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
                 .map(c => ({
                     id: c.id._serialized,
@@ -177,12 +180,17 @@ function initWhatsApp() {
                     foto: null
                 }));
 
-            contatosSalvos = simplifiedContacts;
-            io.emit('init_contacts', simplifiedContacts);
-            console.log(`✅ Agenda finalizada: ${simplifiedContacts.length} contatos.`);
+            // Mescla agenda com contatos salvos sem duplicar
+            agenda.forEach(ac => {
+                if (!contatosSalvos.find(cs => cs.id === ac.id)) {
+                    contatosSalvos.push(ac);
+                }
+            });
+
+            io.emit('init_contacts', contatosSalvos);
 
         } catch (err) {
-            console.error("Erro na sincronização profunda:", err);
+            console.error("Erro na sincronização Master:", err);
         }
     });
 

@@ -170,6 +170,7 @@ const WhatsAppAICenter = () => {
                     rawId: c.id,
                     name: c.name,
                     photo: c.foto,
+                    lastMessageTimestamp: c.lastMessageTimestamp || 0,
                     messages: []
                 };
             }
@@ -181,15 +182,13 @@ const WhatsAppAICenter = () => {
                 return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
             })
             .sort((a: any, b: any) => {
-                // Ordenação estritamente por mensagem mais recente (estilo WhatsApp Web)
-                const lastA = a.messages[0]?.timestamp || 0;
-                const lastB = b.messages[0]?.timestamp || 0;
+                const lastA = Math.max(a.lastMessageTimestamp || 0, a.messages[0]?.timestamp || 0);
+                const lastB = Math.max(b.lastMessageTimestamp || 0, b.messages[0]?.timestamp || 0);
 
                 if (lastA !== lastB) {
                     return lastB - lastA;
                 }
 
-                // Se nenhum tem mensagem, ordem alfabética
                 return a.name.localeCompare(b.name);
             }) as any[];
     })();
@@ -432,9 +431,9 @@ const WhatsAppAICenter = () => {
                                 </div>
                                 <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
                                     {groupedContacts.length === 0 && isConnected && (
-                                        <div className="p-8 text-center">
+                                        <div className="p-8 text-center text-slate-400">
                                             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                                            <p className="text-[11px] text-slate-400">Sincronizando contatos do celular...</p>
+                                            <p className="text-[11px]">Sincronizando chats ativos...</p>
                                         </div>
                                     )}
                                     {groupedContacts.map((c: any) => (

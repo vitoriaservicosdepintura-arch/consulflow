@@ -180,7 +180,7 @@ function initWhatsApp() {
 
             // Filtramos apenas os 100 mais RECENTES e que não sejam grupos
             const recentChats = allChats
-                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us') && !c.id._serialized.includes('@broadcast'))
                 .slice(0, 100);
 
             // 3. Carga Rápida Inicial (Apenas o que já temos no chat object)
@@ -218,6 +218,8 @@ function initWhatsApp() {
                             if (contactObj) {
                                 contatosSalvos[idx].name = contactObj.name || contactObj.pushname || contactObj.verifiedName || chatObj?.name || c.number;
                                 contatosSalvos[idx].foto = await client.getProfilePicUrl(c.id).catch(() => null);
+                                // Pega o número real formatado (ex: +351 912 345 678)
+                                contatosSalvos[idx].number = await contactObj.getFormattedNumber().catch(() => c.number);
                             }
 
                             if (chatObj) {

@@ -173,7 +173,7 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
             if (!acc[key]) {
                 acc[key] = {
                     id: key,
-                    number: key.split('@')[0],
+                    number: msg.de_raw?.split('@')[0] || key.split('@')[0],
                     rawId: key,
                     name: msg.nome || key.split('@')[0],
                     photo: msg.foto || null,
@@ -208,7 +208,7 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
         return Object.values(acc)
             .filter((c: any) => {
                 const q = contactSearch.toLowerCase();
-                return !q || c.name.toLowerCase().includes(q) || c.number.includes(q);
+                return !q || c.name.toLowerCase().includes(q) || (c.number && c.number.includes(q)) || c.id.includes(q);
             })
             .sort((a: any, b: any) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0)) as any[];
     }, [allContacts, realMessages, contactSearch]);
@@ -481,7 +481,7 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
                                                         {c.lastMessageTime || (c.messages.length > 0 ? c.messages[0].horario : "")}
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-indigo-600/70 font-bold tracking-tight mb-1">+{c.id.split('@')[0]}</p>
+                                                <p className="text-[10px] text-indigo-600 font-bold tracking-tight mb-1">{c.number ? (c.number.startsWith('+') ? c.number : `+${c.number}`) : `+${c.id.split('@')[0]}`}</p>
                                                 <div className="flex items-center gap-1">
                                                     {c.lastMessageFromMe && <CheckCheck className="w-3.5 h-3.5 text-sky-500 shrink-0" />}
                                                     <p className="text-[12px] text-slate-500 truncate leading-snug">
@@ -513,7 +513,7 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm leading-tight">{activeContact.name}</h3>
-                                                    <p className="text-[10px] text-indigo-600 font-bold mb-0.5">+{activeContact.id.split('@')[0]}</p>
+                                                    <p className="text-[10px] text-indigo-600 font-bold mb-0.5">{activeContact.number ? (activeContact.number.startsWith('+') ? activeContact.number : `+${activeContact.number}`) : `+${activeContact.id.split('@')[0]}`}</p>
                                                     <div className="flex items-center gap-1.5">
                                                         {presencas[activeContact.id]?.isOnline ? (
                                                             <div className="flex items-center gap-1">

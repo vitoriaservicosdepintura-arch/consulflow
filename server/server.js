@@ -195,50 +195,48 @@ function initWhatsApp() {
             console.log(`📂 Enviando ${contatosSalvos.length} contatos iniciais...`);
             io.emit('init_contacts', contatosSalvos);
 
-            // 4. Enriquecimento Sequencial Rápido (Melhor que paralelo para não sobrecarregar o Puppeteer)
+            // 4. Enriquecimento em Lotes (Pool de processamento)
+            const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
+            const contactChunks = chunkArray(contatosSalvos, 10);
+
             (async () => {
-                for (let i = 0; i < contatosSalvos.length; i++) {
-                    const c = contatosSalvos[i];
-                    try {
-                        // Busca o contato real para pegar o nome da agenda/pushname
-                        const contactObj = await client.getContactById(c.id).catch(() => null);
-                        const chatObj = await client.getChatById(c.id).catch(() => null);
+                for (const chunk of contactChunks) {
+                    await Promise.all(chunk.map(async (c) => {
+                        try {
+                            const idx = contatosSalvos.findIndex(item => item.id === c.id);
+                            if (idx === -1) return;
 
-                        if (contactObj) {
-                            const nomeReal = contactObj.name || contactObj.pushname || contactObj.verifiedName || chatObj?.name || c.number;
-                            const foto = await client.getProfilePicUrl(c.id).catch(() => null);
+                            const contactObj = await client.getContactById(c.id).catch(() => null);
+                            const chatObj = await client.getChatById(c.id).catch(() => null);
 
-                            contatosSalvos[i].name = nomeReal;
-                            contatosSalvos[i].foto = foto;
-                        }
+                            if (contactObj) {
+                                contatosSalvos[idx].name = contactObj.name || contactObj.pushname || contactObj.verifiedName || chatObj?.name || c.number;
+                                contatosSalvos[idx].foto = await client.getProfilePicUrl(c.id).catch(() => null);
+                            }
 
-                        if (chatObj) {
-                            const msgs = await chatObj.fetchMessages({ limit: 40 }).catch(() => []);
-                            if (msgs.length > 0) {
-                                const last = msgs[msgs.length - 1];
-                                contatosSalvos[i].lastMessageText = last.body || _tipoMensagem(last.type);
-                                contatosSalvos[i].lastMessageFromMe = last.fromMe;
-                                contatosSalvos[i].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                                contatosSalvos[i].lastMessageTimestamp = last.timestamp * 1000;
+                            if (chatObj) {
+                                const msgs = await chatObj.fetchMessages({ limit: 40 }).catch(() => []);
+                                if (msgs.length > 0) {
+                                    const last = msgs[msgs.length - 1];
+                                    contatosSalvos[idx].lastMessageText = last.body || _tipoMensagem(last.type);
+                                    contatosSalvos[idx].lastMessageFromMe = last.fromMe;
+                                    contatosSalvos[idx].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                    contatosSalvos[idx].lastMessageTimestamp = last.timestamp * 1000;
 
-                                for (const m of msgs) {
-                                    await processarMensagemSync(m, contatosSalvos[i].foto, contatosSalvos[i].name);
+                                    // Sincroniza mensagens sem baixar mídia (mais leve)
+                                    msgs.forEach(m => processarMensagemSync(m, contatosSalvos[idx].foto, contatosSalvos[idx].name));
                                 }
                             }
+                        } catch (e) {
+                            console.error(`❌ Erro no contato ${c.id}:`, e.message);
                         }
+                    }));
 
-                        // Emite atualizações em pequenos lotes ou a cada 5 contatos para não sobrecarregar o socket
-                        if (i % 5 === 0 || i === contatosSalvos.length - 1) {
-                            saveCache();
-                            io.emit('init_contacts', contatosSalvos);
-                            io.emit('init_messages', mensagensRecebidas);
-                        }
-                    } catch (e) {
-                        console.error(`❌ Erro no enriquecimento do contato ${c.id}:`, e.message);
-                    }
+                    saveCache();
+                    io.emit('init_contacts', contatosSalvos);
+                    io.emit('init_messages', mensagensRecebidas);
                 }
-                saveCache();
-                console.log("✅ Sincronização completa de nomes e mensagens concluída.");
+                console.log("✅ Sincronização em lotes concluída.");
             })();
         } catch (err) {
             console.error("❌ Erro crítico na sincronização:", err);
@@ -266,18 +264,15 @@ function initWhatsApp() {
         if (contatoExistente) {
             let mediaData = null;
             const tiposMidia = ['image', 'video', 'audio', 'ptt', 'document', 'sticker'];
+            // Durante a sincronização pesada, NÃO baixamos mídia para não travar o servidor
+            /*
             if (msg.hasMedia && tiposMidia.includes(msg.type)) {
                 try {
                     const media = await msg.downloadMedia().catch(() => null);
-                    if (media) {
-                        mediaData = {
-                            mimetype: media.mimetype,
-                            data: media.data,
-                            filename: media.filename || null
-                        };
-                    }
+                    // ...
                 } catch (e) { }
             }
+            */
 
             const textoExibivel = msg.body || (msg.hasMedia ? _tipoMensagem(msg.type) : '');
 

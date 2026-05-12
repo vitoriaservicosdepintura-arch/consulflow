@@ -454,11 +454,9 @@ const WhatsAppAICenter = () => {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between gap-1">
                                                     <h4 className="text-[13px] font-semibold text-slate-900 truncate flex-1">{c.name}</h4>
-                                                    {c.messages.length > 0 && (
-                                                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                                                            {c.messages[0].horario}
-                                                        </span>
-                                                    )}
+                                                    <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                                                        {c.lastMessageTime || (c.messages.length > 0 ? c.messages[0].horario : "")}
+                                                    </span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     {(c.lastMessageFromMe || (c.messages.length > 0 && c.messages[0].fromMe)) && (

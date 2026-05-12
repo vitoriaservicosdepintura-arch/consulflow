@@ -123,67 +123,84 @@ function initWhatsApp() {
     });
 
     client.on('ready', async () => {
-        console.log('✅ WhatsApp CONECTADO - Sincronização Progressiva');
+        console.log('✅ WhatsApp PRONTO - Iniciando Carga de Elite');
         isConnected = true;
         qrCodeData = '';
 
-        // 1. AVISO IMEDIATO NA TELA (0ms)
-        io.emit('status_update', { status: 'conectado' });
-
         try {
-            // 2. CARGA ESTRUTURAL (Vapt-Vupt)
+            // 1. Busca os chats (A ordem aqui já é a do celular)
             const chats = await client.getChats();
+            console.log(`📂 Processando ${chats.length} conversas...`);
 
-            // Cria lista inicial rápida (nomes e IDs) para não ter tela vazia
-            contatosSalvos = chats
-                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
-                .map(c => ({
-                    id: c.id._serialized,
-                    name: c.name || "Sem Nome",
-                    number: c.id.user,
-                    foto: null,
-                    lastMessageTimestamp: c.timestamp || 0,
-                    lastMessageText: "",
-                    lastMessageFromMe: false
-                }));
+            // 2. CARGA DE ELITE: Pega os 20 primeiros com DETALHES TOTAIS (Foto + Última Msg)
+            // Fazemos isso em um bloco rápido antes do primeiro aviso
+            const eliteChats = await Promise.all(chats.slice(0, 20).map(async (chat) => {
+                const peerId = chat.id._serialized;
+                if (!peerId || peerId.includes('@g.us')) return null;
 
-            // EMITE IMEDIATAMENTE - O painel lateral aparece cheio na hora!
+                try {
+                    const foto = await client.getProfilePicUrl(peerId).catch(() => null);
+                    const lastMsgs = await chat.fetchMessages({ limit: 1 }).catch(() => []);
+                    const lastMsg = lastMsgs[0];
+
+                    if (lastMsg) {
+                        await processarMensagemSync(lastMsg, foto);
+                    }
+
+                    return {
+                        id: peerId,
+                        name: chat.name || "Sem Nome",
+                        number: peerId.split('@')[0],
+                        foto: foto,
+                        lastMessageTimestamp: chat.timestamp || 0,
+                        lastMessageText: lastMsg ? lastMsg.body : "",
+                        lastMessageFromMe: lastMsg ? lastMsg.fromMe : false,
+                        lastMessageTime: lastMsg ? new Date(lastMsg.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ""
+                    };
+                } catch (e) {
+                    return { id: peerId, name: chat.name || "Sem Nome", number: peerId.split('@')[0], foto: null, lastMessageTimestamp: chat.timestamp || 0 };
+                }
+            }));
+
+            contatosSalvos = eliteChats.filter(c => c !== null);
+
+            // LIBERA A TELA - Agora com os 20 primeiros COMPLETOS (fotos e msgs)
+            io.emit('status_update', { status: 'conectado' });
             io.emit('init_contacts', contatosSalvos);
+            io.emit('init_messages', mensagensRecebidas);
 
-            // 3. TRABALHADOR DE BACKGROUND (Preenche fotos e mensagens gradualmente)
+            // 3. CARGA COMPLEMENTAR: Faz o resto da lista em background
             (async () => {
-                mensagensRecebidas = []; // Limpa histórico para nova carga
-                for (const c of contatosSalvos) {
+                const remaining = chats.slice(20, 100);
+                for (const c of remaining) {
+                    const peerId = c.id._serialized;
+                    if (!peerId || peerId.includes('@g.us')) continue;
+
                     try {
-                        const chatObj = await client.getChatById(c.id);
-                        const foto = await client.getProfilePicUrl(c.id).catch(() => null);
+                        const foto = await client.getProfilePicUrl(peerId).catch(() => null);
+                        const lastMsgs = await c.fetchMessages({ limit: 1 }).catch(() => []);
 
-                        // Busca Histórico (20 msgs por contato para ser rápido)
-                        const msgs = await chatObj.fetchMessages({ limit: 20 }).catch(() => []);
+                        contatosSalvos.push({
+                            id: peerId,
+                            name: c.name || "Sem Nome",
+                            number: peerId.split('@')[0],
+                            foto: foto,
+                            lastMessageTimestamp: c.timestamp || 0,
+                            lastMessageText: lastMsgs.length > 0 ? lastMsgs[0].body : "",
+                            lastMessageFromMe: lastMsgs.length > 0 ? lastMsgs[0].fromMe : false
+                        });
 
-                        const idx = contatosSalvos.findIndex(cs => cs.id === c.id);
-                        if (idx !== -1) {
-                            contatosSalvos[idx].foto = foto;
-                            if (msgs.length > 0) {
-                                contatosSalvos[idx].lastMessageText = msgs[msgs.length - 1].body;
-                                contatosSalvos[idx].lastMessageFromMe = msgs[msgs.length - 1].fromMe;
-                            }
-
-                            for (const m of msgs) {
-                                await processarMensagemSync(m, foto);
-                            }
-
-                            // Emite atualização para manter o front vivo e fluido
+                        // Atualiza a cada 10 para não sobrecarregar
+                        if (contatosSalvos.length % 10 === 0) {
                             io.emit('init_contacts', contatosSalvos);
-                            io.emit('init_messages', mensagensRecebidas);
                         }
                     } catch (e) { }
                 }
-                console.log("✅ Sincronização de histórico finalizada.");
             })();
 
         } catch (err) {
-            console.error("Erro na carga progressiva:", err);
+            console.error("Erro na carga de elite:", err);
+            io.emit('status_update', { status: 'conectado' });
         }
     });
 

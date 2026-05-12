@@ -453,8 +453,7 @@ const WhatsAppAICenter = () => {
                                 <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
                                     {groupedContacts.length === 0 && isConnected && (
                                         <div className="p-8 text-center text-slate-400">
-                                            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                                            <p className="text-[11px]">Sincronizando chats ativos...</p>
+                                            <p className="text-[11px]">Nenhuma conversa recente</p>
                                         </div>
                                     )}
                                     {groupedContacts.map((c: any) => (

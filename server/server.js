@@ -88,9 +88,13 @@ function initWhatsApp() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--proxy-server="direct://"',
+                '--proxy-bypass-list=*'
             ]
-        }
+        },
+        authTimeoutMs: 60000,
+        qrMaxRetries: 10
     });
 
     async function processarMensagem(msg, emitir = true) {
@@ -388,6 +392,15 @@ function initWhatsApp() {
                 await gerarRespostaIA(peerId, msg.body);
             }
         }
+    });
+
+    client.on('disconnected', (reason) => {
+        console.log('❌ WhatsApp Desconectado:', reason);
+        isConnected = false;
+        qrCodeData = '';
+        io.emit('status_update', { status: 'iniciando', mensagem: 'Desconectado do WhatsApp' });
+        // Tenta reinicializar após um tempo
+        setTimeout(() => initWhatsApp(), 5000);
     });
 
     setTimeout(() => {

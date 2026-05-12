@@ -163,14 +163,18 @@ function initWhatsApp() {
 
             // 2. Agenda Completa em segundo plano (sem travar)
             console.log("🔄 Mapeando agenda completa...");
-            const contacts = await client.getContacts();
+            const contacts = await client.getContacts().catch(err => {
+                console.error("❌ Erro ao buscar contatos:", err.message);
+                return [];
+            });
+
             const simplifiedContacts = contacts
-                .filter(c => c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
+                .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
                 .map(c => ({
                     id: c.id._serialized,
                     name: c.name || c.pushname || c.number || "Sem Nome",
                     number: c.number || (c.id ? c.id.user : ""),
-                    foto: null // As fotos da agenda virão sob demanda ou depois
+                    foto: null
                 }));
 
             contatosSalvos = simplifiedContacts;

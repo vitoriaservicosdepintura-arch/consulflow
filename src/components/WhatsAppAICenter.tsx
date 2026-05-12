@@ -253,22 +253,28 @@ const WhatsAppAICenter = () => {
         return () => { socket.disconnect(); };
     }, [apiUrl, activeContact?.id]);
 
-    // Initial Data
+    // Initial Data & Fallback Polling
     useEffect(() => {
-        const init = async () => {
+        const loadData = async () => {
             try {
                 const resStatus = await fetch(`${apiUrl}/api/status`);
                 const data = await resStatus.json();
                 if (data.status === 'conectado') setIsConnected(true);
+
                 const resMsgs = await fetch(`${apiUrl}/api/mensagens`);
                 if (resMsgs.ok) setRealMessages(await resMsgs.json());
-                const resIA = await fetch(`${apiUrl}/api/ia/status`);
-                if (resIA.ok) setIaStatus(await resIA.json());
+
                 const resContacts = await fetch(`${apiUrl}/api/contatos`);
-                if (resContacts.ok) setAllContacts(await resContacts.json());
-            } catch { }
+                if (resContacts.ok) {
+                    const contacts = await resContacts.json();
+                    if (contacts.length > 0) setAllContacts(contacts);
+                }
+            } catch (err) { console.error("Erro no fetch inicial:", err); }
         };
-        init();
+
+        loadData();
+        const interval = setInterval(loadData, 5000); // Tenta atualizar a cada 5s se estiver vazio
+        return () => clearInterval(interval);
     }, [apiUrl]);
 
     // RESTAURADO: Buscar fotos de perfil e presença inicial
@@ -425,6 +431,12 @@ const WhatsAppAICenter = () => {
                                     </div>
                                 </div>
                                 <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
+                                    {groupedContacts.length === 0 && isConnected && (
+                                        <div className="p-8 text-center">
+                                            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                            <p className="text-[11px] text-slate-400">Sincronizando contatos do celular...</p>
+                                        </div>
+                                    )}
                                     {groupedContacts.map((c: any) => (
                                         <div key={c.id} onClick={() => setActiveContact(c)} className={`p-4 cursor-pointer border-b transition-all flex gap-3 hover:bg-emerald-50 ${activeContact?.id === c.id ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}>
                                             <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center font-bold text-emerald-700 relative overflow-hidden shrink-0">

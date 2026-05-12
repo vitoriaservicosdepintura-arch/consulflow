@@ -534,7 +534,10 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
                                                 </div>
                                             </div>
                                             <button
-                                                onClick={() => onImportLead?.({ name: activeContact.name, phone: activeContact.id.split('@')[0] })}
+                                                onClick={() => onImportLead?.({
+                                                    name: activeContact.name,
+                                                    phone: activeContact.number || activeContact.id.split('@')[0]
+                                                })}
                                                 className="px-4 py-1.5 rounded-full text-[10px] font-bold transition-all bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 flex items-center gap-1.5"
                                             >
                                                 <UserPlus2 className="w-3.5 h-3.5" /> IMPORTAR PARA NOVO LEADS

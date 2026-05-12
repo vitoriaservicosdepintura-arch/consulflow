@@ -172,12 +172,21 @@ function initWhatsApp() {
         isConnected = true;
         qrCodeData = '';
 
-        // 1. Limpa lixo anterior
-        contatosSalvos = [];
-        mensagensRecebidas = [];
+        // Mantemos o que já temos no cache para exibição IMEDIATA
+        isConnected = true;
+        qrCodeData = '';
+
+        // Se já temos contatos no cache, emitimos logo para o painel não ficar vazio
+        if (contatosSalvos.length > 0) {
+            io.emit('init_contacts', contatosSalvos);
+            io.emit('init_messages', mensagensRecebidas);
+        }
+
+        // Emitimos conectado para liberar a UI na hora
+        io.emit('status_update', { status: 'conectado' });
 
         try {
-            console.log("📂 Iniciando busca de chats (getChats)...");
+            console.log("📂 Iniciando atualização de chats em background...");
             const start = Date.now();
             const allChats = await client.getChats();
             console.log(`📂 Busca concluída em ${((Date.now() - start) / 1000).toFixed(1)}s. Total: ${allChats.length}`);
@@ -204,10 +213,7 @@ function initWhatsApp() {
 
             console.log(`📂 Enviando ${contatosSalvos.length} contatos iniciais...`);
             io.emit('init_contacts', contatosSalvos);
-            // AGORA sim liberamos o status conectado no frontend
-            io.emit('status_update', { status: 'conectado' });
-
-            // 4. Enriquecimento em Lotes (Pool de processamento)
+            // 4. Enriquecimento em Lote (Pool de processamento)
             const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
             const contactChunks = chunkArray(contatosSalvos, 10);
 

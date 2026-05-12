@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = (email: string, password: string) => {
     if (
       email === "vitoriaservicosdepintura@gmail.com" &&
-      password === "10203040"
+      password === "admin2511"
     ) {
       setIsAuthenticated(true);
       setShowWelcome(true);

@@ -146,71 +146,69 @@ function initWhatsApp() {
                 .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us'))
                 .slice(0, 100);
 
-            console.log(`📂 Sincronizando os ${recentChats.length} chats mais recentes...`);
-
             // 3. Carga Rápida Inicial (Apenas o que já temos no chat object)
-            contatosSalvos = recentChats.map(c => ({
-                id: c.id._serialized,
-                name: c.name || c.id.user,
-                number: c.id.user,
-                foto: null,
-                lastMessageTimestamp: c.timestamp * 1000,
-                lastMessageText: "",
-                lastMessageFromMe: false,
-                lastMessageTime: new Date(c.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-            }));
+            contatosSalvos = recentChats.map(c => {
+                const lastMsg = c.lastMessage;
+                return {
+                    id: c.id._serialized,
+                    name: c.name || c.id.user,
+                    number: c.id.user,
+                    foto: null,
+                    lastMessageTimestamp: (lastMsg?.timestamp || c.timestamp) * 1000,
+                    lastMessageText: lastMsg?.body || _tipoMensagem(lastMsg?.type) || "",
+                    lastMessageFromMe: lastMsg?.fromMe || false,
+                    lastMessageTime: new Date((lastMsg?.timestamp || c.timestamp) * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                };
+            });
 
-            // Destrava a tela IMEDIATAMENTE
+            console.log(`📂 Enviando ${contatosSalvos.length} contatos iniciais...`);
             io.emit('init_contacts', contatosSalvos);
 
-            // 4. Processamento em Lotes (Paralelo controlado para não travar o Puppeteer)
-            const processBatch = async (batch) => {
-                await Promise.all(batch.map(async (c) => {
+            // 4. Enriquecimento Sequencial Rápido (Melhor que paralelo para não sobrecarregar o Puppeteer)
+            (async () => {
+                for (let i = 0; i < contatosSalvos.length; i++) {
+                    const c = contatosSalvos[i];
                     try {
-                        const chatObj = await client.getChatById(c.id);
+                        // Busca o contato real para pegar o nome da agenda/pushname
                         const contactObj = await client.getContactById(c.id).catch(() => null);
+                        const chatObj = await client.getChatById(c.id).catch(() => null);
 
-                        const idx = contatosSalvos.findIndex(ct => ct.id === c.id);
-                        if (idx !== -1) {
-                            const nomeReal = contactObj?.name || contactObj?.pushname || contactObj?.verifiedName || chatObj.name || c.number;
+                        if (contactObj) {
+                            const nomeReal = contactObj.name || contactObj.pushname || contactObj.verifiedName || chatObj?.name || c.number;
                             const foto = await client.getProfilePicUrl(c.id).catch(() => null);
 
-                            contatosSalvos[idx].name = nomeReal;
-                            contatosSalvos[idx].foto = foto;
+                            contatosSalvos[i].name = nomeReal;
+                            contatosSalvos[i].foto = foto;
+                        }
 
+                        if (chatObj) {
                             const msgs = await chatObj.fetchMessages({ limit: 40 }).catch(() => []);
                             if (msgs.length > 0) {
                                 const last = msgs[msgs.length - 1];
-                                contatosSalvos[idx].lastMessageText = last.body || _tipoMensagem(last.type);
-                                contatosSalvos[idx].lastMessageFromMe = last.fromMe;
-                                contatosSalvos[idx].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                                contatosSalvos[idx].lastMessageTimestamp = last.timestamp * 1000;
+                                contatosSalvos[i].lastMessageText = last.body || _tipoMensagem(last.type);
+                                contatosSalvos[i].lastMessageFromMe = last.fromMe;
+                                contatosSalvos[i].lastMessageTime = new Date(last.timestamp * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                contatosSalvos[i].lastMessageTimestamp = last.timestamp * 1000;
 
                                 for (const m of msgs) {
-                                    await processarMensagemSync(m, foto, nomeReal);
+                                    await processarMensagemSync(m, contatosSalvos[i].foto, contatosSalvos[i].name);
                                 }
                             }
-                            // Emite atualização do contato individualmente se quiser, 
-                            // ou emite a lista completa a cada batch
+                        }
+
+                        // Emite atualizações em pequenos lotes ou a cada 5 contatos para não sobrecarregar o socket
+                        if (i % 5 === 0 || i === contatosSalvos.length - 1) {
+                            io.emit('init_contacts', contatosSalvos);
+                            io.emit('init_messages', mensagensRecebidas);
                         }
                     } catch (e) {
-                        console.error(`Erro no contato ${c.id}:`, e.message);
+                        console.error(`❌ Erro no enriquecimento do contato ${c.id}:`, e.message);
                     }
-                }));
-            };
-
-            // Divide em lotes de 10 para performance
-            const batchSize = 10;
-            for (let i = 0; i < recentChats.length; i += batchSize) {
-                const batch = recentChats.slice(i, i + batchSize);
-                await processBatch(batch);
-                io.emit('init_contacts', contatosSalvos);
-                io.emit('init_messages', mensagensRecebidas);
-            }
-
-            console.log("✅ Sincronização completa concluída.");
+                }
+                console.log("✅ Sincronização completa de nomes e mensagens concluída.");
+            })();
         } catch (err) {
-            console.error("Erro na sincronização:", err);
+            console.error("❌ Erro crítico na sincronização:", err);
             io.emit('status_update', { status: 'conectado' });
         }
     });

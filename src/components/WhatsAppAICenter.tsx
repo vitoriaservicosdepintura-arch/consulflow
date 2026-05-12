@@ -216,7 +216,11 @@ const WhatsAppAICenter = () => {
     useEffect(() => {
         if (activeContact) {
             const updated = groupedContacts.find(c => c.id === activeContact.id);
-            if (updated && updated.messages.length !== activeContact.messages.length) {
+            if (updated && (
+                updated.messages.length !== activeContact.messages.length ||
+                updated.name !== activeContact.name ||
+                updated.photo !== activeContact.photo
+            )) {
                 setActiveContact(updated);
             }
         }

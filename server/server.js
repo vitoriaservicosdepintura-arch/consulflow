@@ -31,6 +31,33 @@ let chatHistoryIA = {};
 let contatosSalvos = [];
 let client;
 
+const CACHE_PATH = path.join(__dirname, 'whatsapp_cache.json');
+
+function saveCache() {
+    try {
+        const cache = { contatosSalvos, mensagensRecebidas, iaAtivaPorContato };
+        fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
+    } catch (e) {
+        console.error("Erro ao salvar cache:", e.message);
+    }
+}
+
+function loadCache() {
+    try {
+        if (fs.existsSync(CACHE_PATH)) {
+            const data = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8'));
+            if (data.contatosSalvos) contatosSalvos = data.contatosSalvos;
+            if (data.mensagensRecebidas) mensagensRecebidas = data.mensagensRecebidas;
+            if (data.iaAtivaPorContato) iaAtivaPorContato = data.iaAtivaPorContato;
+            console.log("📦 Cache local carregado com sucesso.");
+        }
+    } catch (e) {
+        console.error("Erro ao carregar cache:", e.message);
+    }
+}
+
+loadCache();
+
 async function getStatus() {
     if (isConnected) return { status: 'conectado' };
     if (qrCodeData) {
@@ -107,7 +134,7 @@ function initWhatsApp() {
                 mensagensRecebidas.push(novaMsg);
                 mensagensRecebidas.sort((a, b) => b.timestamp - a.timestamp);
                 if (mensagensRecebidas.length > 2000) mensagensRecebidas.pop();
-
+                saveCache();
                 if (emitir) io.emit('nova_mensagem', novaMsg);
                 console.log(`📩 [SOCKET] Nova mensagem emitida: ${novaMsg.id} de ${novaMsg.nome}`);
             }
@@ -198,6 +225,7 @@ function initWhatsApp() {
 
                         // Emite atualizações em pequenos lotes ou a cada 5 contatos para não sobrecarregar o socket
                         if (i % 5 === 0 || i === contatosSalvos.length - 1) {
+                            saveCache();
                             io.emit('init_contacts', contatosSalvos);
                             io.emit('init_messages', mensagensRecebidas);
                         }
@@ -205,6 +233,7 @@ function initWhatsApp() {
                         console.error(`❌ Erro no enriquecimento do contato ${c.id}:`, e.message);
                     }
                 }
+                saveCache();
                 console.log("✅ Sincronização completa de nomes e mensagens concluída.");
             })();
         } catch (err) {
@@ -438,6 +467,7 @@ app.post('/api/desconectar', async (req, res) => {
         qrCodeData = '';
         mensagensRecebidas = [];
         contatosSalvos = [];
+        if (fs.existsSync(CACHE_PATH)) fs.unlinkSync(CACHE_PATH);
         io.emit('status_update', { status: 'iniciando' });
         io.emit('init_messages', []);
         io.emit('init_contacts', []);

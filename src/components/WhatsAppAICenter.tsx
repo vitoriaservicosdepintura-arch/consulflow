@@ -522,30 +522,15 @@ const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: stri
                                                 <div className="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center font-bold text-white overflow-hidden shadow-sm">
                                                     {profilePics[activeContact.id] && profilePics[activeContact.id] !== 'none' ? (
                                                         <img src={profilePics[activeContact.id]} alt="Profile" className="w-full h-full object-cover" />
+                                                    ) : activeContact.photo ? (
+                                                        <img src={activeContact.photo} alt="Profile" className="w-full h-full object-cover" />
                                                     ) : (
                                                         (activeContact.name || "?").charAt(0).toUpperCase()
                                                     )}
-
-
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-sm leading-tight">{activeContact.name}</h3>
                                                     <p className="text-[10px] text-indigo-600 font-bold mb-0.5">{activeContact.number ? (activeContact.number.startsWith('+') ? activeContact.number : `+${activeContact.number}`) : `+${activeContact.id.split('@')[0]}`}</p>
-                                                    <div className="flex items-center gap-1.5">
-                                                        {presencas[activeContact.id]?.isOnline ? (
-                                                            <div className="flex items-center gap-1">
-                                                                <span className="text-[11px] text-emerald-500 font-medium">online</span>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-[10px] text-slate-500 font-medium">
-                                                                {presencas[activeContact.id]?.lastSeen ? `visto por último ${presencas[activeContact.id].lastSeen}` : 'offline'}
-                                                            </span>
-                                                        )}
-                                                        <span className="text-slate-300 text-[10px]">|</span>
-                                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${iaStatus[activeContact.rawId] ? 'text-amber-500' : 'text-emerald-500'}`}>
-                                                            {iaStatus[activeContact.rawId] ? 'IA Ativa' : 'Humano'}
-                                                        </span>
-                                                    </div>
                                                 </div>
                                             </div>
                                             <button

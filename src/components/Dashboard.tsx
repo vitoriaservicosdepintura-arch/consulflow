@@ -86,12 +86,31 @@ const Dashboard = () => {
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [editLead, setEditLead] = useState<Lead | Partial<Lead> | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   const openEdit = (lead: Lead) => { setEditLead(lead); setFormOpen(true); };
-  const openNew = () => { setEditLead(null); setFormOpen(true); };
+  const openNew = (initialData?: Partial<Lead>) => {
+    if (initialData) {
+      setEditLead(initialData as Lead);
+    } else {
+      setEditLead(null);
+    }
+    setFormOpen(true);
+  };
   const closeForm = () => { setFormOpen(false); setEditLead(null); };
+
+  const handleImportLead = (data: { name: string, phone: string }) => {
+    setTab("leads");
+    setTimeout(() => {
+      openNew({
+        name: data.name,
+        phone: data.phone,
+        funnelStage: "Novo Lead",
+        country: "Brasil"
+      });
+    }, 100);
+  };
 
   const getExportData = () => {
     const data = leads.map(l => ({
@@ -389,7 +408,7 @@ const Dashboard = () => {
           </>
         )}
         {tab === "reports" && <PDFReports />}
-        {tab === "whatsapp-ia" && <WhatsAppAICenter />}
+        {tab === "whatsapp-ia" && <WhatsAppAICenter onImportLead={handleImportLead} />}
         {tab === "messages" && <MessagingSystem />}
         {tab === "editors" && <EditorsHub onSelect={setTab} />}
         {tab === "editor" && <TextEditor />}

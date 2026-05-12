@@ -4,7 +4,7 @@ import { useLeads } from "@/contexts/LeadContext";
 import { X } from "lucide-react";
 
 interface Props {
-  lead?: Lead | null;
+  lead?: Lead | Partial<Lead> | null;
   onClose: () => void;
 }
 
@@ -28,10 +28,10 @@ const LeadForm = ({ lead, onClose }: Props) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (lead) {
+    if (lead && 'id' in lead) {
       updateLead(lead.id, form);
     } else {
-      addLead(form);
+      addLead(form as any);
     }
     onClose();
   };

@@ -26,7 +26,8 @@ import {
     MoreVertical,
     CheckCheck,
     ArrowLeft,
-    File
+    File,
+    UserPlus2
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -121,7 +122,7 @@ const AudioPlayer = ({ src, isMe }: { src: string, isMe: boolean }) => {
     );
 };
 
-const WhatsAppAICenter = () => {
+const WhatsAppAICenter = ({ onImportLead }: { onImportLead?: (data: { name: string, phone: string }) => void }) => {
     const [isConnected, setIsConnected] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
     const [qrStatus, setQrStatus] = useState<'loading' | 'ready' | 'connecting' | 'success'>('loading');
@@ -530,8 +531,11 @@ const WhatsAppAICenter = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button onClick={handleToggleIA} className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all ${iaStatus[activeContact.rawId] ? 'bg-amber-500 text-white shadow-lg' : 'bg-slate-100 text-slate-600'}`}>
-                                                {iaStatus[activeContact.rawId] ? 'IA ATIVA' : 'ATIVAR IA'}
+                                            <button
+                                                onClick={() => onImportLead?.({ name: activeContact.name, phone: activeContact.id.split('@')[0] })}
+                                                className="px-4 py-1.5 rounded-full text-[10px] font-bold transition-all bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 flex items-center gap-1.5"
+                                            >
+                                                <UserPlus2 className="w-3.5 h-3.5" /> IMPORTAR PARA NOVO LEADS
                                             </button>
                                         </div>
 

@@ -19,6 +19,7 @@ import SmartScheduling from "./SmartScheduling";
 import FollowUpSystem from "./FollowUpSystem";
 import WhatsAppAICenter from "./WhatsAppAICenter";
 import WhatsAppLeadImporter from "./WhatsAppLeadImporter";
+import EditorsHub from "./EditorsHub";
 import { toast } from "sonner";
 
 
@@ -46,7 +47,7 @@ import { useEffect } from "react";
 
 import { LucideIcon } from "lucide-react";
 
-type Tab = "dashboard" | "leads" | "reports" | "messages" | "whatsapp-ia" | "editor" | "spreadsheet" | "pdf-editor" | "scheduling" | "follow-up" | "maps" | "docs" | "profile";
+type Tab = "dashboard" | "leads" | "reports" | "messages" | "whatsapp-ia" | "editors" | "editor" | "spreadsheet" | "pdf-editor" | "scheduling" | "follow-up" | "maps" | "docs" | "profile";
 
 
 
@@ -57,15 +58,10 @@ const TAB_CONFIG: { key: Tab; label: string; icon: LucideIcon }[] = [
   { key: "reports", label: "Relatórios", icon: FileText },
   { key: "whatsapp-ia", label: "WhatsApp IA", icon: MessageCircle },
   { key: "messages", label: "Mensagens", icon: MessageSquare },
-
-  { key: "editor", label: "Editor", icon: FileText },
-  { key: "spreadsheet", label: "Planilha", icon: Sheet },
-  { key: "pdf-editor", label: "Editor PDF", icon: FileSearch },
+  { key: "editors", label: "Editores", icon: FileSearch },
   { key: "scheduling", label: "Agendamentos", icon: CalendarIcon },
   { key: "follow-up", label: "Follow-ups", icon: RotateCcw },
   { key: "maps", label: "Maps", icon: MapPin },
-
-
   { key: "docs", label: "Documentação", icon: Globe },
   { key: "profile", label: "Perfil", icon: User },
 ];
@@ -397,7 +393,7 @@ const Dashboard = () => {
         {tab === "reports" && <PDFReports />}
         {tab === "whatsapp-ia" && <WhatsAppAICenter />}
         {tab === "messages" && <MessagingSystem />}
-
+        {tab === "editors" && <EditorsHub onSelect={setTab} />}
         {tab === "editor" && <TextEditor />}
         {tab === "spreadsheet" && <Spreadsheet />}
         {tab === "pdf-editor" && <PDFEditor />}

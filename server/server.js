@@ -49,11 +49,11 @@ function initWhatsApp() {
         authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
         webVersionCache: {
             type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1021105994-alpha.html',
         },
         puppeteer: {
             headless: true,
-            executablePath: process.env.CHROMIUM_PATH || undefined, // Removido fixo de linux para funcionar no windows automaticamente
+            executablePath: process.env.CHROMIUM_PATH || undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -302,7 +302,7 @@ function initWhatsApp() {
             console.error('ERRO Puppeteer:', err.message);
             io.emit('status_update', { status: 'erro', mensagem: err.message });
         });
-    }, 5000);
+    }, 8000); // Delay maior para evitar conflitos de sessão
 }
 
 io.on('connection', async (socket) => {
@@ -389,6 +389,47 @@ app.post('/api/desconectar', async (req, res) => {
     } catch (e) {
         console.error("Erro na rota de desconexão:", e);
         if (!res.headersSent) res.status(500).send();
+    }
+});
+
+// Rota de reset nuclear - limpa TODO o cache de sessão
+app.post('/api/reset-session', async (req, res) => {
+    try {
+        console.log("💣 Reset nuclear solicitado...");
+        res.json({ ok: true, msg: 'Reset iniciado' });
+
+        isConnected = false;
+        qrCodeData = '';
+        mensagensRecebidas = [];
+        contatosSalvos = [];
+
+        io.emit('status_update', { status: 'iniciando' });
+        io.emit('init_messages', []);
+        io.emit('init_contacts', []);
+
+        // Destroi o cliente sem tentar logout (evita trava)
+        if (client) {
+            await client.destroy().catch(() => { });
+        }
+
+        // Aguarda o Chrome soltar os arquivos
+        await new Promise(r => setTimeout(r, 3000));
+
+        // Remove TUDO: pasta de auth e cache do wwebjs
+        const authPath = path.join(__dirname, '.wwebjs_auth');
+        const cachePath = path.join(__dirname, '.wwebjs_cache');
+        [authPath, cachePath].forEach(p => {
+            if (fs.existsSync(p)) {
+                fs.rmSync(p, { recursive: true, force: true });
+                console.log(`✅ Removido: ${p}`);
+            }
+        });
+
+        console.log("🚀 Reiniciando com sessão limpa...");
+        setTimeout(() => initWhatsApp(), 2000);
+
+    } catch (e) {
+        console.error("Erro no reset:", e);
     }
 });
 app.options('*', cors());

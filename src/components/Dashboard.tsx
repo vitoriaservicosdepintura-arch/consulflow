@@ -18,6 +18,7 @@ import PDFEditor from "./PDFEditor";
 import SmartScheduling from "./SmartScheduling";
 import FollowUpSystem from "./FollowUpSystem";
 import WhatsAppAICenter from "./WhatsAppAICenter";
+import WhatsAppLeadImporter from "./WhatsAppLeadImporter";
 import { toast } from "sonner";
 
 
@@ -38,7 +39,7 @@ import {
   Building2, Search, Plus, Table2, Columns3, Download, LogOut, Filter,
   FileText, MessageSquare, MapPin, Globe, BarChart3, Sheet, User, Bell, Sparkles,
   FileSpreadsheet, Image as ImageIcon, FileCheck, FileSearch, Calendar as CalendarIcon,
-  RotateCcw, MessageCircle
+  RotateCcw, MessageCircle, UserPlus
 } from "lucide-react";
 
 import { useEffect } from "react";
@@ -90,6 +91,7 @@ const Dashboard = () => {
   const [filterStage, setFilterStage] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const openEdit = (lead: Lead) => { setEditLead(lead); setFormOpen(true); };
   const openNew = () => { setEditLead(null); setFormOpen(true); };
@@ -359,6 +361,12 @@ const Dashboard = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <button
+                onClick={() => setImportOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border border-emerald-500/60 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                <MessageCircle className="w-4 h-4" /> Importar WhatsApp
+              </button>
               <button onClick={openNew}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-primary-foreground hover:scale-[1.02] active:scale-[0.98] transition-all"
                 style={{ background: "var(--gradient-primary)" }}>
@@ -403,6 +411,7 @@ const Dashboard = () => {
       </main>
 
       {formOpen && <LeadForm lead={editLead} onClose={closeForm} />}
+      {importOpen && <WhatsAppLeadImporter onClose={() => setImportOpen(false)} />}
     </div>
   );
 };

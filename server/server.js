@@ -308,27 +308,51 @@ app.post('/api/enviar', async (req, res) => {
 app.post('/api/desconectar', async (req, res) => {
     try {
         console.log("♻️ Solicitando desconexão profunda...");
+
+        // Resposta imediata para o frontend não travar
+        res.json({ ok: true });
+
+        isConnected = false;
+        qrCodeData = '';
+        mensagensRecebidas = [];
+        contatosSalvos = []; // Limpa a agenda ao desconectar
+
+        io.emit('status_update', { status: 'iniciando' });
+        io.emit('init_messages', []);
+        io.emit('init_contacts', []);
+
         if (client) {
-            await client.logout().catch(() => { });
+            console.log("🛑 Finalizando cliente WhatsApp...");
+            // Tenta logout e destroy, mas não espera eternamente (catch resolve rápido)
+            await Promise.race([
+                client.logout().catch(() => { }),
+                new Promise(resolve => setTimeout(resolve, 3000))
+            ]);
             await client.destroy().catch(() => { });
         }
 
         const authPath = path.join(__dirname, '.wwebjs_auth');
         if (fs.existsSync(authPath)) {
-            try { fs.rmSync(authPath, { recursive: true, force: true }); } catch (err) { }
+            console.log("📂 Removendo pasta de autenticação...");
+            try {
+                // Pequeno delay para garantir que o Chrome soltou os arquivos
+                setTimeout(() => {
+                    fs.rmSync(authPath, { recursive: true, force: true });
+                    console.log("✅ Limpeza de cache concluída. Reiniciando...");
+                    initWhatsApp();
+                }, 1000);
+            } catch (err) {
+                console.error("Erro ao remover pasta auth:", err.message);
+                initWhatsApp(); // Reinicia mesmo se falhar a limpeza
+            }
+        } else {
+            initWhatsApp();
         }
 
-        isConnected = false; qrCodeData = ''; mensagensRecebidas = [];
-        io.emit('status_update', { status: 'iniciando' });
-        io.emit('init_messages', []);
-
-        res.json({ ok: true });
-
-        // Pequena pausa para garantir liberação de memória
-        setTimeout(() => {
-            initWhatsApp();
-        }, 2000);
-    } catch (e) { res.status(500).send(); }
+    } catch (e) {
+        console.error("Erro na rota de desconexão:", e);
+        if (!res.headersSent) res.status(500).send();
+    }
 });
 app.options('*', cors());
 app.use((req, res, next) => {

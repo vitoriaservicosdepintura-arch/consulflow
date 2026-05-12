@@ -63,7 +63,6 @@ const TAB_CONFIG: { key: Tab; label: string; icon: LucideIcon }[] = [
   { key: "follow-up", label: "Follow-ups", icon: RotateCcw },
   { key: "maps", label: "Maps", icon: MapPin },
   { key: "docs", label: "Documentação", icon: Globe },
-  { key: "profile", label: "Perfil", icon: User },
 ];
 
 const Dashboard = () => {
@@ -255,7 +254,7 @@ const Dashboard = () => {
 
             <button
               onClick={() => setTab("profile")}
-              className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-border bg-secondary/30 hover:bg-secondary transition-all group"
+              className={`flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border transition-all group ${tab === 'profile' ? 'border-primary bg-primary/10' : 'border-border bg-secondary/30 hover:bg-secondary'}`}
             >
               <span className="text-xs font-semibold text-foreground hidden sm:block pl-1">{user.name.split(' ')[0]}</span>
               <img src={user.photo} className="w-8 h-8 rounded-full border border-border group-hover:scale-105 transition-transform object-cover" />

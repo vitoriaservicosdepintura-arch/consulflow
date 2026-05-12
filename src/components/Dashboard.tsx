@@ -361,12 +361,6 @@ const Dashboard = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button
-                onClick={() => setImportOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border border-emerald-500/60 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <MessageCircle className="w-4 h-4" /> Importar WhatsApp
-              </button>
               <button onClick={openNew}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-primary-foreground hover:scale-[1.02] active:scale-[0.98] transition-all"
                 style={{ background: "var(--gradient-primary)" }}>

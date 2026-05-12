@@ -172,9 +172,6 @@ function initWhatsApp() {
         isConnected = true;
         qrCodeData = '';
 
-        // Emite status IMEDIATAMENTE para liberar o frontend
-        io.emit('status_update', { status: 'conectado' });
-
         // 1. Limpa lixo anterior
         contatosSalvos = [];
         mensagensRecebidas = [];
@@ -188,7 +185,7 @@ function initWhatsApp() {
             // Filtramos apenas os 100 mais RECENTES e que não sejam grupos
             const recentChats = allChats
                 .filter(c => c && c.id && c.id._serialized && !c.id._serialized.includes('@g.us') && !c.id._serialized.includes('@broadcast'))
-                .slice(0, 100);
+                .slice(0, 200);
 
             // 3. Carga Rápida Inicial (Apenas o que já temos no chat object)
             contatosSalvos = recentChats.map(c => {
@@ -198,15 +195,17 @@ function initWhatsApp() {
                     name: c.name || c.id.user,
                     number: c.id.user,
                     foto: null,
-                    lastMessageTimestamp: (lastMsg?.timestamp || c.timestamp) * 1000,
+                    lastMessageTimestamp: (lastMsg?.timestamp || c.timestamp || 0) * 1000,
                     lastMessageText: lastMsg?.body || _tipoMensagem(lastMsg?.type) || "",
                     lastMessageFromMe: lastMsg?.fromMe || false,
-                    lastMessageTime: new Date((lastMsg?.timestamp || c.timestamp) * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                    lastMessageTime: new Date((lastMsg?.timestamp || c.timestamp || Date.now() / 1000) * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                 };
             });
 
             console.log(`📂 Enviando ${contatosSalvos.length} contatos iniciais...`);
             io.emit('init_contacts', contatosSalvos);
+            // AGORA sim liberamos o status conectado no frontend
+            io.emit('status_update', { status: 'conectado' });
 
             // 4. Enriquecimento em Lotes (Pool de processamento)
             const chunkArray = (arr, size) => Array.from({ length: Math.ceil(arr.length / size) }, (v, i) => arr.slice(i * size, i * size + size));
